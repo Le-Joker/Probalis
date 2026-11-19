@@ -186,7 +186,7 @@
   var currencyOf = function (country) { return (country && P.countries[country]) || P.default_currency[lang] || 'EUR'; };
   var money = function (v, code, digits) {
     try {
-      return new Intl.NumberFormat(loc, { style: 'currency', currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
+      return new Intl.NumberFormat(lang === 'fr' ? 'fr-FR' : 'en-US', { style: 'currency', currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
     } catch (e) { return v + ' ' + code; }
   };
 
@@ -201,7 +201,7 @@
 
     var defaults = function () {
       return { premium_until: null, email_news: false, email_reminders: true, favorite_leagues: [], lang: lang, country: null,
-        is_adult: false, welcome_sent_at: null };
+        is_adult: false, welcome_sent_at: null, tz: null };
     };
     var isPremium = function (s) {
       s = s === undefined ? state : s;
@@ -750,8 +750,14 @@
     var afterLogin = function (s) {
       if (!s || !s.user) return;
       var steps = Promise.resolve(s);
-      if (local.get('pb-adult') === '1' && !s.profile.is_adult) steps = steps.then(function () { return api.update({ is_adult: true }); });
+      var patch = {};
+      if (local.get('pb-adult') === '1' && !s.profile.is_adult) patch.is_adult = true;
       local.del('pb-adult');
+      // Fuseau horaire du téléphone : pour écrire l'heure des matchs dans les e-mails
+      var tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+      if (tz && s.profile.tz !== tz) patch.tz = tz;
+      if (!s.profile.country) patch.country = guessCountry();
+      if (Object.keys(patch).length) steps = steps.then(function () { return api.update(patch); }).catch(noop);
       if (!s.profile.welcome_sent_at) {
         api.welcome().catch(noop);
         toast(fmt(T.welcome, { n: (s.user.name || '').split(' ')[0] || '' }));
@@ -764,8 +770,9 @@
     // Retour d'un paiement
     var q = params();
     var payReturn = function () {
-      if (q.paiement === 'annule' || q.status === 'cancelled') { flash(scope, T.pay_cancel, 'warn'); cleanUrl(); return; }
-      if (q.paiement !== 'ok') return;
+      // Stripe revient avec ?paiement=ok&session_id=… ; Flutterwave avec ?status=…&tx_ref=…&transaction_id=…
+      if (q.paiement === 'annule' || q.status === 'cancelled' || q.status === 'failed') { flash(scope, T.pay_cancel, 'warn'); cleanUrl(); return; }
+      if (q.paiement !== 'ok' && !q.transaction_id) return;
       flash(scope, T.pay_pending);
       var tries = 0;
       var confirmP = q.session_id ? api.confirm({ provider: 'stripe', session_id: q.session_id })
@@ -780,6 +787,20 @@
       };
       confirmP.then(poll, poll);
     };
+
+    // Lien « Me désinscrire » d'une alerte : marche même sans être connecté (lien signé)
+    if (q.desabo && q.u && q.t) {
+      var kind = q.desabo === 'reminders' ? 'reminders' : 'news';
+      var unsub = Acct.demo ? Promise.resolve(true) : fetch(CFG.sb.url + '/functions/v1/unsubscribe', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', apikey: CFG.sb.key },
+        body: JSON.stringify({ u: q.u, k: kind, t: q.t }) }).then(function (r) { return r.ok; });
+      cleanUrl();
+      unsub.then(function (ok) {
+        flash(scope, ok ? T['unsub_' + kind] : T.unsub_bad, ok ? undefined : 'warn');
+        var st = Acct.get();
+        if (ok && !Acct.demo && st && st.user && st.user.id === q.u) api.session().then(render, noop);
+      }, function () { flash(scope, T.error, 'bad'); });
+    }
 
     if (check) {
       api.session().then(function (s) {
@@ -925,6 +946,48 @@
     render();
   };
 
+  // ---------- Gratuit : 1 analyse complète par jour, sur le match choisi (gardé sur le téléphone) ----------
+  var Free = {
+    today: function () {
+      var d = new Date();
+      return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    },
+    get: function () {
+      try { var f = JSON.parse(local.get('pb-free') || 'null'); return f && f.d === Free.today() ? f : null; } catch (e) { return null; }
+    },
+    use: function (slug, name) { local.set('pb-free', JSON.stringify({ d: Free.today(), m: slug, n: name })); }
+  };
+  var slugOf = function (href) { var r = /match\/([^\/?#]+)\.html/.exec(href || ''); return r ? r[1] : null; };
+  var initFree = function (scope) {
+    var f = Free.get();
+    if (f) {
+      var links = scope.querySelectorAll('a.mcard, a.pick, a.featured');
+      for (var i = 0; i < links.length; i++) if (slugOf(links[i].getAttribute('href')) === f.m) links[i].classList.add('free-ok');
+    }
+    var card = scope.querySelector('#free-card');
+    if (!card) return;
+    var app = card.closest('.app');
+    var slug = card.dataset.slug;
+    var render = function () {
+      var cur = Free.get();
+      var mine = !!cur && cur.m === slug;
+      if (app) app.classList.toggle('free-ok', mine);
+      card.dataset.state = mine ? 'this' : cur ? 'used' : 'new';
+      if (cur && !mine) {
+        var a = card.querySelector('[data-free-link]');
+        a.textContent = cur.n || cur.m;
+        a.setAttribute('href', cur.m + '.html');
+      }
+    };
+    render();
+    card.querySelector('#free-use').addEventListener('click', function () {
+      if (Free.get()) { render(); return; }  // déjà utilisée (autre onglet)
+      Free.use(slug, card.dataset.name);
+      render();
+      toast(T.free_unlocked);
+    });
+  };
+
   var init = function (scope) {
     initDates(scope);
     initImages(scope);
@@ -934,6 +997,7 @@
     initCompare(scope);
     initAccount(scope);
     initPremium(scope);
+    initFree(scope);
   };
 
   // =====================================================================================================

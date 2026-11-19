@@ -1,0 +1,53 @@
+# Probalis : e-mails du jour (alerte « grand choc demain » et rappel avant la fin du Premium).
+# Tourne une fois par jour, après la mise à jour des analyses de 8 h 17 UTC. Voir docs/06-comptes-premium-emails.md.
+# Tant que la variable PROBALIS_SUPABASE_URL n'est pas enregistrée, la tâche est simplement sautée (aucune minute
+# GitHub consommée, aucun échec). Si elle l'est mais qu'un secret manque, le script s'arrête proprement sans rien envoyer.
+name: E-mails du jour
+
+on:
+  schedule:
+    - cron: "7 9 * * *"     # 9 h 07 UTC : 10 h à Paris et Douala, 9 h à Dakar et Abidjan
+  workflow_dispatch:        # bouton « Run workflow » pour lancer à la main
+    inputs:
+      dry_run:
+        description: "Simulation (montre ce qui serait envoyé, n'envoie rien)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: emails
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  emails:
+    if: ${{ vars.PROBALIS_SUPABASE_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONIOENCODING: utf-8
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      UNSUBSCRIBE_SECRET: ${{ secrets.UNSUBSCRIBE_SECRET }}
+      PROBALIS_SITE_URL: ${{ vars.PROBALIS_SITE_URL }}
+      PROBALIS_CONTACT_EMAIL: ${{ vars.PROBALIS_CONTACT_EMAIL }}
+      EMAIL_DAILY_CAP: ${{ vars.EMAIL_DAILY_CAP }}
+      BIG_MATCH_MIN: ${{ vars.BIG_MATCH_MIN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Installer Probalis
+        run: pip install -e . tzdata
+
+      - name: Envoyer les e-mails du jour
+        run: python -m probalis.site.emails daily ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}

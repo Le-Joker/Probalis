@@ -17,8 +17,10 @@
   <div class="ct-row head"><span></span><span>{{ t.cmp_free }}</span><span class="pr">{{ t.cmp_premium }}</span></div>
   {% for label, free, prem in t.cmp_rows %}
   <div class="ct-row"><span>{{ label }}</span>
-    <span class="{{ 'y' if free else 'n' }}">{{ icon('check' if free else 'x', 16, 2.6) }}<span class="sr-only">{{ t.cmp_free }}</span></span>
-    <span class="{{ 'y' if prem else 'n' }} pr">{{ icon('check' if prem else 'x', 16, 2.6) }}<span class="sr-only">{{ t.cmp_premium }}</span></span>
+    {% for v, col in ((free, t.cmp_free), (prem, t.cmp_premium)) %}
+    {% if v is string %}<span class="txt{% if loop.last %} pr{% endif %}"><span class="sr-only">{{ col }} : </span>{{ v }}</span>
+    {% else %}<span class="{{ 'y' if v else 'n' }}{% if loop.last %} pr{% endif %}">{{ icon('check' if v else 'x', 16, 2.6) }}<span class="sr-only">{{ col }}</span></span>{% endif %}
+    {% endfor %}
   </div>
   {% endfor %}
 </section>

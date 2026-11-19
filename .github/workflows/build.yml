@@ -26,6 +26,13 @@ jobs:
     env:
       PYTHONIOENCODING: utf-8
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Réglages publics du site (variables GitHub, voir docs/06-comptes-premium-emails.md).
+      # Tant qu'ils sont vides, le site tourne en « mode démo » (connexion et Premium simulés).
+      PROBALIS_SITE_URL: ${{ vars.PROBALIS_SITE_URL }}
+      PROBALIS_SUPABASE_URL: ${{ vars.PROBALIS_SUPABASE_URL }}
+      PROBALIS_SUPABASE_ANON_KEY: ${{ vars.PROBALIS_SUPABASE_ANON_KEY }}
+      PROBALIS_CONTACT_EMAIL: ${{ vars.PROBALIS_CONTACT_EMAIL }}
+      PROBALIS_OWNER_NAME: ${{ vars.PROBALIS_OWNER_NAME }}
     steps:
       - uses: actions/checkout@v4
 

@@ -1,12 +1,14 @@
 {% extends "base.html" %}
-{% from "_card.html" import crest, league_logo, bar3, pcts, ad, lock_pill %}
-{% macro row(r, sub=none) %}<div class="r{% if r.free is defined and not r.free %} locked{% endif %}"><div class="r-l"><span>{{ r.label }}{% if r.push %} <small>({{ t.push }} {{ r.push }})</small>{% endif %}</span>{% if sub %}<small>{{ sub }}</small>{% endif %}<i class="meter"><i class="{{ r.level }}" style="width: {{ r.w }}%"></i></i></div><b class="r-p">{{ r.pct }}</b><span class="pill">{{ r.fair }}</span></div>{% endmacro %}
+{% from "_card.html" import crest, league_logo, bar3, pcts, ad %}
+{% macro row(r, sub=none) %}<div class="r"><div class="r-l"><span>{{ r.label }}{% if r.push %} <small>({{ t.push }} {{ r.push }})</small>{% endif %}</span>{% if sub %}<small>{{ sub }}</small>{% endif %}<i class="meter"><i class="{{ r.level }}" style="width: {{ r.w }}%"></i></i></div><b class="r-p">{{ r.pct }}</b><span class="pill">{{ r.fair }}</span></div>{% endmacro %}
 {% macro legend() %}<span class="legend" aria-hidden="true"><span>{{ t.chance }}</span><span>{{ t.fair_odds }}</span></span>{% endmacro %}
 {% block title %}{{ m.home.name }} – {{ m.away.name }} : {% if lang == 'fr' %}analyse et probabilités{% else %}analysis and probabilities{% endif %} · Probalis{% endblock %}
 {% block description %}{{ m.league_name }} · {{ m.home.name }} {{ m.p1_txt }}, {{ t.draw }} {{ m.px_txt }}, {{ m.away.name }} {{ m.p2_txt }}.{% endblock %}
 
 {% block header %}
-<header class="hero">
+<header class="hero locked">
+  {# Gratuit : si ce match est l'analyse gratuite du jour, on l'affiche tout de suite (sans flou au chargement) #}
+  <script>try{var f=JSON.parse(localStorage.getItem('pb-free')||'null'),d=new Date(),k=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);if(f&&f.d===k&&f.m==={{ m.slug|tojson }})document.currentScript.closest('.app').classList.add('free-ok')}catch(e){}</script>
   <span class="hero-ring" aria-hidden="true"></span>
   <div class="hero-top">
     <a class="round glass" href="{{ root }}index.html" aria-label="{{ t.back }}" title="{{ t.back }}">{{ icon('arrow-left', 20, 2.2) }}</a>
@@ -29,6 +31,23 @@
 {% endblock %}
 
 {% block content %}
+<section class="card free-card js-only" id="free-card" data-slug="{{ m.slug }}" data-name="{{ m.home.name }} – {{ m.away.name }}" data-state="" aria-live="polite">
+  <div class="fc fc-new">
+    <span class="fc-ic">{{ icon('gift', 20, 2.2) }}</span>
+    <h2>{{ t.free_title }}</h2>
+    <p>{{ t.free_text }}</p>
+    <button class="btn" type="button" id="free-use">{{ icon('zap', 18, 2.2) }}{{ t.free_use }}</button>
+    <a class="btn ghost" href="{{ root }}premium.html">{{ icon('crown', 18, 2.2) }}{{ t.lock_cta }}</a>
+  </div>
+  <div class="fc fc-used">
+    <span class="fc-ic">{{ icon('lock', 20, 2.2) }}</span>
+    <h2>{{ t.free_used_title }}</h2>
+    <p>{{ t.free_used_text }} <a data-free-link href="#"></a>. {{ t.free_next }}</p>
+    <a class="btn" href="{{ root }}premium.html">{{ icon('crown', 18, 2.2) }}{{ t.lock_cta }}</a>
+  </div>
+  <p class="fc fc-this">{{ icon('check', 16, 2.6) }}<span>{{ t.free_this }}</span></p>
+</section>
+
 <div class="tabs-anchor" id="tabs-anchor"></div>
 <nav class="ptabs scroll-x" aria-label="{{ t.market_tabs }}">
   <a href="#p-resume" id="tab-resume" class="on">{{ t.summary }}</a>
@@ -38,7 +57,7 @@
 </nav>
 
 <section class="panel" id="p-resume" aria-label="{{ t.summary }}">
-  <section class="card">
+  <section class="card locked">
     <h2>{{ t.xg }}</h2>
     <div class="xg"><b>{{ m.xg_home }}</b><span>{{ t.xg_total.format(x=m.xg_total) }}</span><b>{{ m.xg_away }}</b></div>
     <div class="split" aria-hidden="true"><i style="width: {{ m.xg_share }}%"></i><i style="width: {{ 100 - m.xg_share }}%"></i></div>
@@ -46,7 +65,7 @@
   </section>
 
   <section class="card locked">
-    <div class="card-head"><h2>{{ t.top_scores_title }}</h2>{{ lock_pill(t, root) }}</div>
+    <h2>{{ t.top_scores_title }}</h2>
     <div class="scores">
     {% for s, p in m.top_scores %}
       <div class="score{% if loop.first %} best{% endif %}"><b>{{ s }}</b><span>{{ p }}</span></div>
@@ -54,18 +73,17 @@
     </div>
   </section>
 
-  <section class="card">
+  <section class="card locked">
     <div class="card-head"><h2>{{ t.key_markets }}</h2>{{ legend() }}</div>
     <div class="rows">
     {% for r in m.key_markets %}{{ row(r, r.market) }}{% endfor %}
     </div>
-    {% if m.key_markets|rejectattr('free')|list %}<a class="lock-row" href="{{ root }}premium.html">{{ icon('lock', 15, 2.4) }}<span>{{ t.lock_free }}</span><b>{{ t.lock_cta }}</b></a>{% endif %}
     <a class="more" href="#p-{{ m.groups[0].key }}" data-tab="p-{{ m.groups[0].key }}">{{ t.see_n_markets.format(n=m.n_markets) }}{{ icon('chev-right', 16, 2.4) }}</a>
   </section>
 
   {{ ad(t, root, 'match') }}
 
-  <section class="card compare js-only" id="compare" aria-labelledby="cmp-title">
+  <section class="card locked compare js-only" id="compare" aria-labelledby="cmp-title">
     <h2 id="cmp-title">{{ t.compare_title }}</h2>
     <p>{{ t.compare_text }}</p>
     <div class="cmp-grid">
@@ -87,7 +105,7 @@
     <script type="application/json" id="cmp-data">{{ {'items': m.compare['items'], 'source': m.compare.source}|tojson }}</script>
   </section>
 
-  <section class="card">
+  <section class="card locked">
     <h2>{{ t.market_odds }}</h2>
     {% if m.priced_view %}
     <div class="otable">
@@ -109,7 +127,7 @@
 {% for g in m.groups %}
 <section class="panel" id="p-{{ g.key }}" aria-label="{{ g.title }}">
   <div class="panel-head"><h2>{{ g.title }}</h2><small>{{ t.n_markets.format(n=g.markets|length) }}</small></div>
-  {% if g.markets|rejectattr('free')|list %}
+  {% if g.locked %}
   <section class="lock-card">
     <span class="lock-ic">{{ icon('lock', 20, 2.2) }}</span>
     <h3>{{ t.lock_title }}</h3>
@@ -120,7 +138,7 @@
   {% endif %}
   {% for mk in g.markets %}
   <section class="card{% if not mk.free %} locked{% endif %}">
-    <div class="card-head"><h3>{{ mk.title }}</h3>{% if not mk.tiles %}{{ legend() }}{% endif %}{% if not mk.free %}{{ lock_pill(t, root) }}{% endif %}</div>
+    <div class="card-head"><h3>{{ mk.title }}</h3>{% if not mk.tiles %}{{ legend() }}{% endif %}</div>
     {% if mk.tiles %}
     <div class="tiles">
       {% for r in mk.rows %}

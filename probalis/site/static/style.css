@@ -655,11 +655,39 @@ html.premium .ad { display: none; }
 .lock-card p { margin: 6px 0 14px; font-size: 13px; line-height: 1.5; color: var(--night-3); }
 .lock-card .btn { width: 100%; }
 .lock-card small { display: block; margin-top: 10px; font-size: 11.5px; line-height: 1.45; color: var(--night-2); }
-html:not(.premium) .card.locked .rows, html:not(.premium) .card.locked .tiles, html:not(.premium) .card.locked .scores {
+/* Gratuit : 1 analyse complète par jour, sur le match choisi (.app.free-ok) ; ailleurs les chiffres sont floutés.
+   Premium (html.premium) : tout est visible. Sans JavaScript, rien n'est flouté. */
+html.js:not(.premium) .app:not(.free-ok) .card.locked :is(.rows, .tiles, .scores, .xg, .split, .otable, .cmp-grid, .cmp-chance, .verdict),
+html.js:not(.premium) .app:not(.free-ok) .hero.locked :is(.bar3, .pcts b),
+html.js:not(.premium) .mcard:not(.free-ok) :is(.boxes, .mc-stats),
+html.js:not(.premium) .featured:not(.free-ok) :is(.bar3, .pcts b, .f-chips),
+html.js:not(.premium) .pick:not(.free-ok) :is(.ring, .pk-txt > b, .pk-fair) {
   filter: blur(5px); opacity: .75; user-select: none; -webkit-user-select: none; pointer-events: none; }
-html:not(.premium) .r.locked .r-p, html:not(.premium) .r.locked .pill { filter: blur(4.5px); user-select: none; -webkit-user-select: none; }
-html.premium .lock-pill, html.premium .lock-card, html.premium .tab-lock, html.premium .lock-row { display: none; }
-html:not(.premium) .card.locked .legend { display: none; }
+html.js:not(.premium) .app:not(.free-ok) .card.locked .legend { display: none; }
+html.premium .lock-pill, html.premium .lock-card, html.premium .tab-lock, html.premium .lock-row,
+html.premium .free-card, html.premium .list-lock, .app.free-ok .lock-card, .app.free-ok .tab-lock,
+html:not(.js) .lock-card, html:not(.js) .tab-lock { display: none; }
+
+.free-card { margin-top: 16px; border: 1.5px solid var(--gold); }
+.free-card:not([data-state="new"]):not([data-state="used"]):not([data-state="this"]), .free-card .fc { display: none; }
+.free-card[data-state="new"] .fc-new, .free-card[data-state="used"] .fc-used { display: block; text-align: center; }
+.free-card[data-state="this"] { border-color: var(--line); padding: 12px 14px; }
+.free-card[data-state="this"] .fc-this { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 700;
+  color: var(--green-ink); }
+.free-card[data-state="this"] .fc-this svg { flex: none; }
+.fc-ic { width: 44px; height: 44px; margin: 0 auto; border-radius: 14px; background: var(--gold-bg); color: var(--gold-ink);
+  display: flex; align-items: center; justify-content: center; }
+.free-card h2 { margin-top: 10px; font-size: 17px; }
+.free-card p { margin: 6px 0 14px; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.free-card p a { font-weight: 800; color: var(--green-ink); }
+.free-card .btn { width: 100%; }
+.free-card .btn + .btn { margin-top: 8px; }
+.list-lock { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; padding: 10px 12px; border-radius: 14px;
+  background: var(--gold-bg); color: var(--gold-ink); font-size: 12.5px; line-height: 1.4; font-weight: 700; }
+.list-lock svg { flex: none; }
+.list-lock span { flex: 1; }
+.list-lock a { flex: none; font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
+.ct-row .txt { font-size: 11.5px; font-weight: 800; line-height: 1.25; text-align: center; color: var(--green-ink); }
 
 /* ---------- Mon compte ---------- */
 .demo-note { display: flex; align-items: flex-start; gap: 8px; margin: 14px 0 0; padding: 10px 12px; border-radius: 14px;

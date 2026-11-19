@@ -1,0 +1,22 @@
+Thanks Awa, your Premium is active!
+
+Here is the receipt for your purchase. Keep it in case you have a question.
+
+Plan : 30-day pass
+Amount : €7.99
+Payment method : Card (Stripe)
+Date : 19 November 2026
+Reference : PB-4F2A9C
+Premium active until : 19 December 2026
+
+One-off payment, no subscription: nothing will be charged automatically when your pass ends.
+
+Enjoy Premium: ../../public/en/
+
+—
+
+18+ · Probabilities are not certainties. Never stake more than you can afford to lose.
+
+You're receiving this email because you have a Probalis account.
+
+Manage my emails: ../../public/en/compte.html

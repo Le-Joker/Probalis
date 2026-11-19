@@ -27,8 +27,9 @@ PRICES_FILE = ROOT / "supabase" / "functions" / "_shared" / "prices.json"
 SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"
 SUPABASE_JS_SRI = "sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o"
 
-# Marchés gratuits : 1X2, plus / moins de buts, les deux équipes marquent. Tout le reste est Premium.
-FREE_MARKETS = frozenset({"1x2", "ou", "btts"})
+# Gratuit : 1 analyse complète par jour, sur le match choisi (compté sur le téléphone, voir static/app.js).
+# Aucun marché n'est ouvert sur tous les matchs : chaque page de match reste floutée jusqu'à ce choix.
+FREE_MARKETS: frozenset[str] = frozenset()
 
 
 def _env(name: str) -> str:

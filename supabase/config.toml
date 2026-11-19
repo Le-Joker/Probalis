@@ -1,0 +1,20 @@
+# Réglages Supabase de Probalis (utilisés par « supabase functions deploy »). Voir docs/06-comptes-premium-emails.md.
+project_id = "probalis"
+
+# Chaque fonction vérifie elle-même qui appelle (jeton de connexion, signature Stripe ou Flutterwave,
+# lien signé) : la vérification automatique de Supabase est donc coupée. Elle bloquerait les avis de paiement
+# de Stripe et Flutterwave et les désinscriptions « en un clic », qui n'ont pas de jeton de connexion.
+[functions.welcome]
+verify_jwt = false
+
+[functions.checkout]
+verify_jwt = false
+
+[functions.confirm-payment]
+verify_jwt = false
+
+[functions.payment-webhook]
+verify_jwt = false
+
+[functions.unsubscribe]
+verify_jwt = false

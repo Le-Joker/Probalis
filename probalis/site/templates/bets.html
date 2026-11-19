@@ -8,6 +8,7 @@
 </div>
 
 {% if likely %}
+<p class="list-lock js-only">{{ icon('lock', 16, 2.4) }}<span>{{ t.picks_lock }}</span><a href="{{ root }}premium.html">{{ t.lock_cta }}</a></p>
 <h2 class="sr-only">{{ t.likely }}</h2>
 <div class="picks">
 {% for e in likely %}
