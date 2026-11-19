@@ -18,6 +18,8 @@ create table if not exists public.profiles (
   email_reminders  boolean not null default true,   -- rappel avant la fin du Premium
   favorite_leagues text[] not null default '{}' check (cardinality(favorite_leagues) <= 60),
   premium_until    timestamptz,
+  free_day         date,   -- jour (heure du téléphone) de la dernière analyse gratuite
+  free_match       text,   -- match choisi ce jour-là
   welcome_sent_at  timestamptz,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
@@ -74,6 +76,35 @@ end $$;
 drop trigger if exists on_auth_user_email on auth.users;
 create trigger on_auth_user_email after update of email on auth.users
   for each row execute function public.sync_user_email();
+
+-- ---------- Gratuit : 1 analyse complète par jour, avec un compte ----------
+-- Le jour vient du téléphone (minuit à l'heure locale), à un jour près de la date du serveur. Une fois le match du
+-- jour choisi, il ne peut plus changer avant le lendemain, même depuis un autre appareil.
+create or replace function public.use_free_analysis(p_match text, p_day date)
+returns table (free_day date, free_match text)
+language plpgsql security definer set search_path = '' as $$
+#variable_conflict use_column
+declare
+  uid uuid := auth.uid();
+  today date := (now() at time zone 'utc')::date;
+begin
+  if uid is null then
+    raise exception 'non connecté';
+  end if;
+  if p_match is null or p_match !~ '^[a-z0-9-]{1,160}$' then
+    raise exception 'match invalide';
+  end if;
+  if p_day is null or p_day < today - 1 or p_day > today + 1 then
+    raise exception 'date invalide';
+  end if;
+  update public.profiles pr
+     set free_day = p_day, free_match = p_match
+   where pr.id = uid and (pr.free_day is null or pr.free_day < p_day);
+  return query select pr.free_day, pr.free_match from public.profiles pr where pr.id = uid;
+end $$;
+
+revoke all on function public.use_free_analysis(text, date) from public, anon;
+grant execute on function public.use_free_analysis(text, date) to authenticated;
 
 -- ---------- Paiements (pass de 7 ou 30 jours, sans abonnement) ----------
 create table if not exists public.payments (

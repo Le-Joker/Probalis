@@ -201,7 +201,7 @@
 
     var defaults = function () {
       return { premium_until: null, email_news: false, email_reminders: true, favorite_leagues: [], lang: lang, country: null,
-        is_adult: false, welcome_sent_at: null, tz: null };
+        is_adult: false, welcome_sent_at: null, tz: null, free_day: null, free_match: null };
     };
     var isPremium = function (s) {
       s = s === undefined ? state : s;
@@ -236,6 +236,12 @@
           profile: Object.assign(defaults(), { is_adult: true, welcome_sent_at: new Date().toISOString() }) }));
       },
       update: function (patch) { var s = clone(state); Object.assign(s.profile, patch); return Promise.resolve(save(s)); },
+      // Analyse gratuite du jour : un seul match par jour, impossible à changer avant le lendemain
+      useFree: function (slug, day) {
+        var s = clone(state);
+        if (!s.profile.free_day || s.profile.free_day < day) { s.profile.free_day = day; s.profile.free_match = slug; }
+        return Promise.resolve(save(s));
+      },
       signOut: function () { return Promise.resolve(save(null)); },
       remove: function () { return Promise.resolve(save(null)); },
       welcome: function () { return Promise.resolve(); },
@@ -298,6 +304,17 @@
         }).then(check).then(function (r) {
           var s = clone(state);
           s.profile = Object.assign(defaults(), r.data);
+          return save(s);
+        });
+      },
+      useFree: function (slug, day) {
+        return sb().then(function (c) {
+          return c.rpc('use_free_analysis', { p_match: slug, p_day: day });
+        }).then(check).then(function (r) {
+          var row = (r.data && r.data[0]) || {};
+          var s = clone(state);
+          s.profile.free_day = row.free_day || null;
+          s.profile.free_match = row.free_match || null;
           return save(s);
         });
       },
@@ -946,45 +963,65 @@
     render();
   };
 
-  // ---------- Gratuit : 1 analyse complète par jour, sur le match choisi (gardé sur le téléphone) ----------
+  // ---------- Gratuit : 1 analyse complète par jour, avec un compte, sur le match choisi ----------
+  // Le choix est gardé dans le profil (free_day, free_match) : il suit le compte sur tous ses appareils.
   var Free = {
-    today: function () {
-      var d = new Date();
-      return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
-    },
+    today: function () { return dayKey(new Date()); },
+    // null : pas connecté ; sinon { m: match choisi aujourd'hui, ou null s'il reste à choisir }
     get: function () {
-      try { var f = JSON.parse(local.get('pb-free') || 'null'); return f && f.d === Free.today() ? f : null; } catch (e) { return null; }
+      var s = Acct.get();
+      if (!s || !s.user) return null;
+      var p = s.profile || {};
+      return { m: p.free_day === Free.today() && p.free_match ? p.free_match : null };
     },
-    use: function (slug, name) { local.set('pb-free', JSON.stringify({ d: Free.today(), m: slug, n: name })); }
+    // Nom du match choisi (pour le lien « tu l'as utilisée sur … »), gardé sur le téléphone
+    name: function (slug, name) {
+      if (name) local.set('pb-free-name', JSON.stringify({ m: slug, n: name }));
+      try { var o = JSON.parse(local.get('pb-free-name') || 'null'); return o && o.m === slug ? o.n : null; } catch (e) { return null; }
+    }
   };
   var slugOf = function (href) { var r = /match\/([^\/?#]+)\.html/.exec(href || ''); return r ? r[1] : null; };
   var initFree = function (scope) {
-    var f = Free.get();
-    if (f) {
-      var links = scope.querySelectorAll('a.mcard, a.pick, a.featured');
-      for (var i = 0; i < links.length; i++) if (slugOf(links[i].getAttribute('href')) === f.m) links[i].classList.add('free-ok');
-    }
     var card = scope.querySelector('#free-card');
-    if (!card) return;
-    var app = card.closest('.app');
-    var slug = card.dataset.slug;
+    var app = card && card.closest('.app');
+    var slug = card && card.dataset.slug;
+    var busy = false;
+    var use = function () {
+      if (busy) return;
+      busy = true;
+      Acct.api.useFree(slug, Free.today()).then(function () {
+        busy = false;
+        var f = Free.get();
+        if (f && f.m === slug) { Free.name(slug, card.dataset.name); toast(T.free_unlocked); }
+        render();
+      }, function () { busy = false; toast(T.error); });
+    };
     var render = function () {
-      var cur = Free.get();
-      var mine = !!cur && cur.m === slug;
+      var f = Free.get();
+      var m = f && f.m;
+      $$('a.mcard, a.pick, a.featured', scope).forEach(function (a) {
+        a.classList.toggle('free-ok', !!m && slugOf(a.getAttribute('href')) === m);
+      });
+      if (!card) return;
+      var mine = !!m && m === slug;
       if (app) app.classList.toggle('free-ok', mine);
-      card.dataset.state = mine ? 'this' : cur ? 'used' : 'new';
-      if (cur && !mine) {
+      card.dataset.state = !f ? 'signin' : mine ? 'this' : m ? 'used' : 'new';
+      if (m && !mine) {
         var a = card.querySelector('[data-free-link]');
-        a.textContent = cur.n || cur.m;
-        a.setAttribute('href', cur.m + '.html');
+        a.textContent = Free.name(m) || T.free_other;
+        a.setAttribute('href', m + '.html');
       }
+      // Retour après la connexion lancée depuis ce match : on le débloque directement
+      if (f && !m && local.get('pb-free-want') === slug) { local.del('pb-free-want'); use(); }
     };
     render();
-    card.querySelector('#free-use').addEventListener('click', function () {
-      if (Free.get()) { render(); return; }  // déjà utilisée (autre onglet)
-      Free.use(slug, card.dataset.name);
-      render();
-      toast(T.free_unlocked);
+    Acct.on(render, function () { return card ? card.isConnected : scope !== doc && scope.isConnected; });
+    if (!card) return;
+    card.querySelector('#free-use').addEventListener('click', use);
+    card.querySelector('#free-signin').addEventListener('click', function () {
+      local.set('pb-free-want', slug);
+      local.set('pb-next', location.pathname);
+      router.go(card.dataset.account);
     });
   };
 

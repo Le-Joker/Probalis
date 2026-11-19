@@ -8,7 +8,7 @@
 {% block header %}
 <header class="hero locked">
   {# Gratuit : si ce match est l'analyse gratuite du jour, on l'affiche tout de suite (sans flou au chargement) #}
-  <script>try{var f=JSON.parse(localStorage.getItem('pb-free')||'null'),d=new Date(),k=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);if(f&&f.d===k&&f.m==={{ m.slug|tojson }})document.currentScript.closest('.app').classList.add('free-ok')}catch(e){}</script>
+  <script>try{var a=JSON.parse(localStorage.getItem('pb-acct')||'null'),p=a&&a.user&&a.profile,d=new Date(),k=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);if(p&&p.free_day===k&&p.free_match==={{ m.slug|tojson }})document.currentScript.closest('.app').classList.add('free-ok')}catch(e){}</script>
   <span class="hero-ring" aria-hidden="true"></span>
   <div class="hero-top">
     <a class="round glass" href="{{ root }}index.html" aria-label="{{ t.back }}" title="{{ t.back }}">{{ icon('arrow-left', 20, 2.2) }}</a>
@@ -31,7 +31,14 @@
 {% endblock %}
 
 {% block content %}
-<section class="card free-card js-only" id="free-card" data-slug="{{ m.slug }}" data-name="{{ m.home.name }} – {{ m.away.name }}" data-state="" aria-live="polite">
+<section class="card free-card js-only" id="free-card" data-slug="{{ m.slug }}" data-name="{{ m.home.name }} – {{ m.away.name }}" data-account="{{ root }}compte.html" data-state="" aria-live="polite">
+  <div class="fc fc-signin">
+    <span class="fc-ic">{{ icon('gift', 20, 2.2) }}</span>
+    <h2>{{ t.free_title }}</h2>
+    <p>{{ t.free_signin_text }}</p>
+    <button class="btn" type="button" id="free-signin">{{ icon('user', 18, 2.2) }}{{ t.free_signin_btn }}</button>
+    <a class="btn ghost" href="{{ root }}premium.html">{{ icon('crown', 18, 2.2) }}{{ t.lock_cta }}</a>
+  </div>
   <div class="fc fc-new">
     <span class="fc-ic">{{ icon('gift', 20, 2.2) }}</span>
     <h2>{{ t.free_title }}</h2>

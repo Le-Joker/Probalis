@@ -9,6 +9,8 @@ import hashlib
 import json
 import math
 import shutil
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -276,12 +278,30 @@ def _likely(views: list[dict], lang: str, n: int = 15) -> list[dict]:
     return out[:n]
 
 
+def _clear(folder: Path, tries: int = 8) -> None:
+    """Vide le dossier du site. Sous Windows, un fichier que l'aperçu local ou l'antivirus vient d'ouvrir peut rester
+    verrouillé un court instant : on réessaie au lieu d'échouer (sans effet sur GitHub, sous Linux)."""
+    def retry(func, path, _exc):
+        for i in range(tries):
+            time.sleep(0.15 * (i + 1))
+            try:
+                func(path)
+                return
+            except FileNotFoundError:
+                return
+            except PermissionError:
+                continue
+        func(path)
+
+    if folder.exists():
+        shutil.rmtree(folder, onexc=retry) if sys.version_info >= (3, 12) else shutil.rmtree(folder, onerror=retry)
+
+
 def build(data: dict) -> Path:
     env = Environment(loader=FileSystemLoader(HERE / "templates"), autoescape=select_autoescape(["html"]),
                       trim_blocks=True, lstrip_blocks=True)
     env.globals.update(icon=icon, logo_mark=logo_mark, google_g=GOOGLE_G)
-    if PUBLIC.exists():
-        shutil.rmtree(PUBLIC)
+    _clear(PUBLIC)
     shutil.copytree(HERE / "static", PUBLIC / "assets")
     icons = PUBLIC / "icons"
     icons.mkdir()

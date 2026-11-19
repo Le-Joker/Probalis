@@ -669,8 +669,9 @@ html.premium .free-card, html.premium .list-lock, .app.free-ok .lock-card, .app.
 html:not(.js) .lock-card, html:not(.js) .tab-lock { display: none; }
 
 .free-card { margin-top: 16px; border: 1.5px solid var(--gold); }
-.free-card:not([data-state="new"]):not([data-state="used"]):not([data-state="this"]), .free-card .fc { display: none; }
-.free-card[data-state="new"] .fc-new, .free-card[data-state="used"] .fc-used { display: block; text-align: center; }
+.free-card[data-state=""], .free-card .fc { display: none; }
+.free-card[data-state="signin"] .fc-signin, .free-card[data-state="new"] .fc-new, .free-card[data-state="used"] .fc-used {
+  display: block; text-align: center; }
 .free-card[data-state="this"] { border-color: var(--line); padding: 12px 14px; }
 .free-card[data-state="this"] .fc-this { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 700;
   color: var(--green-ink); }

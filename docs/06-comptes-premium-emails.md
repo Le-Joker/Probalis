@@ -16,10 +16,12 @@ Tant que Supabase n'est pas branché, le site est en **mode démo** (un bandeau 
 
 - connexion simulée (case 18+ obligatoire), page Mon compte complète, préférences, suppression du compte ;
 - page Premium : prix selon le pays (détecté automatiquement), paiement simulé, Premium activé sur le téléphone ;
-- version gratuite : **1 analyse complète par jour**, sur le match choisi (bouton « Voir l'analyse de ce match »),
+- version gratuite : **avec un compte**, **1 analyse complète par jour**, sur le match choisi (bouton « Voir
+  l'analyse de ce match » ; sans compte, le bouton propose de se connecter puis débloque le match au retour),
   avec quelques pubs « maison » pour Premium. Ailleurs, les chiffres sont floutés : pages des autres matchs,
   probabilités de la liste des matchs, paris les plus probables. Le compteur repart chaque jour à minuit (heure
-  du téléphone) ;
+  du téléphone). En vrai mode, le match choisi est gardé dans le profil : il ne change plus de la journée, même
+  sur un autre appareil ;
 - aperçus des e-mails : ouvre `docs/emails/index.html` dans le navigateur.
 
 ## 2. Les comptes à créer et ce qu'ils coûtent
@@ -95,6 +97,15 @@ aussi leur bouton « Se désabonner ». Personne ne reçoit deux fois le même e
 Pour changer les textes : `probalis/site/emails/__init__.py`, puis `python -m probalis.site.emails generate`.
 
 ## 6. Stripe (cartes, Apple Pay, Google Pay)
+
+> **Pays de l'entreprise.** Stripe n'ouvre des comptes qu'aux entreprises installées dans une cinquantaine de pays
+> (liste sur stripe.com/global : Europe, Royaume-Uni, États-Unis, Canada, etc.). En Afrique, seuls la Côte d'Ivoire,
+> le Ghana, le Kenya, le Nigeria et l'Afrique du Sud sont acceptés, et ils passent par Paystack (filiale de Stripe,
+> autre branchement technique à prévoir). Si ton activité est enregistrée ailleurs (Cameroun, Sénégal…), Stripe direct
+> n'est pas possible : on peut alors tout faire passer par Flutterwave (cartes du monde entier + mobile money), en
+> changeant seulement `supabase/functions/_shared/prices.json`.
+> Stripe interdit les « prévisions sportives avec un gain à la clé » ; Probalis ne fait gagner aucun lot, mais fais
+> confirmer l'activité par le support de Stripe avant d'encaisser.
 
 1. Crée le compte sur stripe.com, renseigne l'activité (voir l'avertissement du point 2) et ton compte bancaire.
 2. **Settings → Payment methods** : vérifie que *Cards*, *Apple Pay*, *Google Pay* (et *Link*) sont actifs. Stripe
@@ -205,9 +216,9 @@ le journal montre ce qui partirait).
 ## 11. Limites de cette première version
 
 - **Le verrou est dans le navigateur.** Les pages du site sont les mêmes pour tout le monde : une personne qui sait
-  lire le code d'une page peut voir les chiffres floutés, et l'analyse gratuite du jour est comptée sur le téléphone
-  (une fenêtre de navigation privée la remet à zéro). Pour un verrou complet, il faudra servir les analyses par une
-  fonction Supabase qui vérifie le compte (étape suivante possible).
+  lire le code d'une page peut voir les chiffres floutés. L'analyse gratuite du jour, elle, est comptée sur le
+  compte (impossible de la remettre à zéro en changeant d'appareil). Pour un verrou complet, il faudra servir les
+  analyses par une fonction Supabase qui vérifie le compte (étape suivante possible).
 - Les pass ne se renouvellent pas tout seuls (choix volontaire : pas d'abonnement caché). Le rappel avant la fin
   invite à reprendre un pass.
 - Les remboursements se font à la main depuis le tableau de bord Stripe ou Flutterwave.
