@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "_picks.html" import pick_card, coupon_card with context %}
+{% block content %}
+<div class="intro">
+  <div class="kicker">{{ t.hist_kicker }}</div>
+  <h1 class="h1">{{ t.hist_h1 }}</h1>
+  <p class="lead">{{ t.hist_lead }}</p>
+</div>
+
+{% if h.since %}<p class="tier-help">{{ icon('calendar', 14, 2.4) }} {{ t.hist_since.format(d=h.since) }}</p>{% endif %}
+
+<section class="hstats" aria-label="{{ t.tiers_label }}">
+{% for r in h.tiers %}
+  <div class="hstat">
+    <span class="hs-name"><i class="tdot {{ r.key }}" aria-hidden="true"></i>{{ r.name }}</span>
+    <b>{{ r.rate_txt }}</b>
+    <small>{% if r.n %}{{ t.hist_n.format(won=r.won, n=r.n) }}{% else %}{{ t.hist_pending }}{% endif %}</small>
+    {% if r.n %}<small class="hs-calib">{{ t.hist_calib.format(a=r.announced_txt, r=r.rate_txt) }}</small>{% endif %}
+  </div>
+{% endfor %}
+</section>
+{% if h.settled < 90 %}<p class="note">{{ t.hist_too_few }}</p>{% endif %}
+
+<section class="card hcoupons" aria-labelledby="hc-title">
+  <h2 id="hc-title">{{ t.hist_coupons }}</h2>
+  <div class="rows">
+  {% for r in h.coupons %}
+    <div class="r"><div class="r-l"><span>{{ r.title }}</span><small>{% if r.n %}{{ t.hist_n.format(won=r.won, n=r.n) }} · {{ t.hist_announced.format(p=r.announced_txt) }}{% else %}{{ t.hist_pending }}{% endif %}</small></div><b class="r-p">{{ r.rate_txt }}</b></div>
+  {% endfor %}
+  </div>
+</section>
+
+<h2 class="sec-title">{{ t.hist_days }}</h2>
+{% for d in h.days %}
+<details class="hday"{% if loop.index <= 2 %} open{% endif %}>
+  <summary>
+    <span class="hd-label">{% if d.is_today %}{{ t.tk_today }} · {% endif %}{{ d.label }}</span>
+    <span class="hd-count">
+      {% if d.won %}<span class="pk-res won">{{ icon('check', 12, 3) }}{{ d.won }}</span>{% endif %}
+      {% if d.lost %}<span class="pk-res lost">{{ icon('x', 12, 3) }}{{ d.lost }}</span>{% endif %}
+      {% if d.wait %}<span class="pk-res wait">{{ icon('clock', 12, 3) }}{{ d.wait }}</span>{% endif %}
+    </span>
+    {{ icon('chev-down', 18, 2.4) }}
+  </summary>
+  {% if d.empty %}<p class="empty">{{ t.no_picks_day }}</p>{% endif %}
+  {% for k in tiers %}{% if d.tiers[k] %}
+  <h3 class="plist-h"><i class="tdot {{ k }}" aria-hidden="true"></i>{{ t['tier_' ~ k] }}</h3>
+  <div class="picks">{% for e in d.tiers[k] %}{{ pick_card(e, hist=true) }}{% endfor %}</div>
+  {% endif %}{% endfor %}
+  {% if d.coupons %}
+  <h3 class="plist-h">{{ icon('ticket', 16, 2.2) }}{{ t.coupons_title }}</h3>
+  {% for cp in d.coupons %}{{ coupon_card(cp, hist=true) }}{% endfor %}
+  {% endif %}
+</details>
+{% else %}
+<p class="empty">{{ t.hist_empty }}</p>
+{% endfor %}
+
+{% if sim %}
+<section class="rel sim" aria-labelledby="sim-title">
+  <div class="rel-head"><span class="badge">{{ icon('chart', 18, 2.2) }}</span><h2 id="sim-title">{{ t.sim_title }}</h2></div>
+  <p>{{ t.sim_lead.format(n=sim.matches_txt[lang]) }}</p>
+  <div class="stats sim-stats">
+  {% for k in tiers %}{% set r = sim.tiers[k] %}
+    <div><span class="hs-name"><i class="tdot {{ k }}" aria-hidden="true"></i>{{ t['tier_' ~ k] }}</span><b>{{ r.rate_txt[lang] }}</b><small>{{ t.sim_rate.format(r=r.rate_txt[lang], a=r.announced_txt[lang], n=r.n_txt[lang]) }}</small><small>{{ t.sim_roi.format(r=r.roi_txt[lang]) }}</small></div>
+  {% endfor %}
+  </div>
+  <ul class="sim-coupons">
+  {% for r in sim.coupons %}
+    <li>{{ t.sim_coupon.format(t=r.target, r=r.rate_txt[lang], a=r.announced_txt[lang], n=r.n_txt[lang]) }} · {{ t.sim_roi.format(r=r.roi_txt[lang]) }}</li>
+  {% endfor %}
+  </ul>
+  <p class="sim-note">{{ t.sim_note }}</p>
+</section>
+{% endif %}
+{% endblock %}

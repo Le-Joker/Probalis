@@ -11,13 +11,13 @@ import math
 import shutil
 import sys
 import time
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ..football.leagues import BY_CODE, LEAGUES
-from . import config, i18n
+from . import config, history, i18n, picks
 from .icons import GOOGLE_G, icon, logo_mark
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,8 +26,6 @@ HERE = Path(__file__).resolve().parent
 BRAND = ROOT / "brand"
 
 CREST_COLORS = ("#1F2937", "#15803D", "#0E7490", "#7C3AED", "#B45309", "#BE123C", "#1D4ED8", "#4D7C0F")
-LIKELY_MARKETS = (("dc", None, ("1X", "X2", "12")), ("ou", 1.5, ("over",)), ("ou", 3.5, ("under",)),
-                  ("1x2", None, ("1", "2")), ("btts", None, ("yes", "no")), ("ou", 2.5, ("over", "under")))
 COMPARE_MARKETS = (("1x2", None), ("dc", None), ("dnb", None), ("ou", 1.5), ("ou", 2.5), ("ou", 3.5), ("btts", None))
 RING = 2 * math.pi * 23  # anneau de probabilité (rayon 23 px) sur la page Paris
 LEGAL_PAGES = (("confidentialite", "privacy_title"), ("conditions", "terms_title"),
@@ -260,22 +258,123 @@ def _featured(views: list[dict]) -> tuple[list[dict], str | None]:
     return cands, lead["id"]
 
 
-def _likely(views: list[dict], lang: str, n: int = 15) -> list[dict]:
+# --- Paris du jour, historique, ticket -------------------------------------------------------------------
+
+def _mini_match(mt: dict, lang: str, slugs: set) -> dict:
+    """Ce qu'il faut pour afficher un match dans une liste de paris (aussi pour les matchs déjà joués)."""
+    ko = datetime.fromisoformat(mt["kickoff"])
+    lg = BY_CODE.get(mt["league"])
+    return {"slug": mt["slug"] if mt["slug"] in slugs else None, "kickoff": mt["kickoff"],
+            "home": mt["home"]["name"], "away": mt["away"]["name"],
+            "home_crest": _crest(mt["home"]), "away_crest": _crest(mt["away"]),
+            "day_short": i18n.day_short(ko, lang), "score": mt.get("score"), "void": mt.get("void"),
+            "league_name": (lg.name_fr if lang == "fr" else lg.name_en) if lg else ""}
+
+
+def _times(p: float, lang: str) -> str:
+    return i18n.UI[lang]["times_ten"].format(n=max(1, min(9, round(p * 10))))
+
+
+def _pick_view(c: dict, mt: dict, lang: str, slugs: set) -> dict:
+    home, away = mt["home"]["name"], mt["away"]["name"]
+    p = c["p"]
+    shown = min(p, 0.99)  # jamais « 100 % » : rien n'est certain
+    label = i18n.pick_label(c["key"], c["sel"], c["line"], lang, home, away)
+    market = i18n.market_title(c["key"], c["line"], lang, home, away)
+    mm = _mini_match(mt, lang, slugs)
+    return {"id": c["id"], "label": label, "market": market, "p": p, "pct": i18n.pct(shown, lang),
+            "dash": f"{RING * shown:.1f} {RING:.1f}", "fair": i18n.odds(c["fair"], lang),
+            "book": i18n.odds(picks.book_odds(c["fair"]), lang), "times": _times(p, lang),
+            "res": c.get("res"), "match": mm,
+            "add": {"id": c["id"], "mid": c["mid"], "key": c["key"], "line": c["line"], "sel": c["sel"], "p": p,
+                    "fair": c["fair"], "l": label, "m": market, "h": home, "a": away, "ko": mt["kickoff"],
+                    "s": mm["slug"]}}
+
+
+def _coupon_view(cp: dict, ms: dict, lang: str, slugs: set) -> dict:
+    t = i18n.UI[lang]
+    legs = [_pick_view(c, ms[c["mid"]], lang, slugs) for c in cp["legs"]]
+    p = min(cp["p"], 0.99)
+    return {"target": cp["target"], "n": len(legs), "legs": legs, "res": cp.get("res"),
+            "title": t["coupon_target"].format(n=cp["target"]),
+            "meta": t["coupon_meta"].format(n=len(legs), p=i18n.pct(p, lang)), "times": _times(p, lang),
+            "book": i18n.odds(cp["book"], lang), "fair": t["coupon_fair"].format(o=i18n.odds(cp["fair"], lang)),
+            "add": [leg["add"] for leg in legs]}
+
+
+def _day_view(day: str, e: dict, lang: str, slugs: set) -> dict:
+    ms = e.get("matches", {})
+    tiers = {tier: [_pick_view(c, ms[c["mid"]], lang, slugs) for c in e.get("tiers", {}).get(tier, [])]
+             for tier in picks.TIERS}
+    coupons = [_coupon_view(cp, ms, lang, slugs) for cp in e.get("coupons", [])]
+    d = date.fromisoformat(day)
+    return {"key": day, "label": i18n.day_med(d, lang), "wd": i18n.weekday_short(d, lang), "dnum": d.day,
+            "tiers": tiers, "coupons": coupons, "empty": not any(tiers.values())}
+
+
+def _paris_days(hist: dict, today: str, lang: str, slugs: set, horizon: int = 7) -> list[dict]:
+    """Jours affichés dans l'onglet Paris : aujourd'hui (liste figée) et les jours suivants."""
+    last = (date.fromisoformat(today) + timedelta(days=horizon)).isoformat()
+    return [_day_view(day, e, lang, slugs) for day, e in sorted(hist.get("days", {}).items())
+            if today <= day <= last]
+
+
+def _rate_view(r: dict, lang: str) -> dict:
+    return {**r, "rate_txt": i18n.pct(r["rate"], lang) if r["rate"] is not None else "—",
+            "announced_txt": i18n.pct(r["announced"], lang) if r["announced"] is not None else "—"}
+
+
+def _history_view(hist: dict, today: str, lang: str, slugs: set, n_days: int = 30) -> dict:
+    t = i18n.UI[lang]
+    s = history.summary(hist.get("days", {}))
+    frozen = sorted((d for d, e in hist.get("days", {}).items() if e.get("frozen")), reverse=True)
+    days = []
+    for day in frozen[:n_days]:
+        v = _day_view(day, hist["days"][day], lang, slugs)
+        items = [c for lst in v["tiers"].values() for c in lst]
+        v["won"] = sum(1 for c in items if c["res"] == "won")
+        v["lost"] = sum(1 for c in items if c["res"] == "lost")
+        v["wait"] = sum(1 for c in items if not c["res"])
+        v["is_today"] = day == today
+        days.append(v)
+    return {"tiers": [{"key": k, "name": t["tier_" + k], **_rate_view(r, lang)} for k, r in s["tiers"].items()],
+            "coupons": [{"target": k, "title": t["coupon_target"].format(n=k), **_rate_view(r, lang)}
+                        for k, r in s["coupons"].items()],
+            "days": days, "since": i18n.day_med(date.fromisoformat(frozen[-1]), lang) if frozen else None,
+            "settled": sum(r["n"] for r in s["tiers"].values())}
+
+
+def _ticket_data(matches: list[dict], lang: str, now: datetime) -> dict:
+    """Matchs à venir et leurs paris classiques, pour le constructeur de coupons (chargé à la demande)."""
     out = []
-    for v in views:
-        for key, line, sels in LIKELY_MARKETS:
-            mk = _find(v, key, line)
-            if not mk:
-                continue
-            for s in sels:
-                sv = _sel_view(v, mk, s, lang)
-                if sv["p"] >= 0.7:
-                    home, away = v["home"]["name"], v["away"]["name"]
-                    out.append({"match": v, "market": i18n.market_title(key, line, lang, home, away),
-                                "dash": f"{RING * sv['p']:.1f} {RING:.1f}", **sv,
-                                "label": _compare_label(key, s, line, lang, home, away)})
-    out.sort(key=lambda e: -e["p"])
-    return out[:n]
+    for m in sorted(matches, key=lambda m: m["kickoff"]):
+        lg = BY_CODE.get(m["league"])
+        if not lg or datetime.fromisoformat(m["kickoff"]) <= now:
+            continue
+        home, away = m["home"]["name"], m["away"]["name"]
+        hc, ac = _crest(m["home"]), _crest(m["away"])
+        out.append({"id": m["id"], "s": m["slug"], "k": m["kickoff"], "d": picks.day_key(m["kickoff"]),
+                    "lg": lg.name_fr if lang == "fr" else lg.name_en, "h": home, "a": away,
+                    "hc": [hc["initials"], hc["color"], hc["img"]], "ac": [ac["initials"], ac["color"], ac["img"]],
+                    "q": m.get("confidence"), "e": 1 if picks.eligible(m) else 0,
+                    "c": [[c["key"], c["line"], c["sel"], c["p"], c["fair"],
+                           i18n.pick_label(c["key"], c["sel"], c["line"], lang, home, away),
+                           i18n.market_title(c["key"], c["line"], lang, home, away)] for c in picks.candidates(m)]})
+    return {"built": now.isoformat(timespec="seconds"), "margin": picks.BOOK_MARGIN,
+            "tiers": {k: list(v) for k, v in picks.TIERS.items()}, "matches": out}
+
+
+SIMULATION = HERE / "simulation.json"
+
+
+def _simulation() -> dict | None:
+    """Résultats de la simulation 2025/26 (mêmes règles que les paris du jour), si le fichier existe."""
+    if not SIMULATION.exists():
+        return None
+    try:
+        return json.loads(SIMULATION.read_text(encoding="utf-8"))
+    except ValueError:
+        return None
 
 
 def _clear(folder: Path, tries: int = 8) -> None:
@@ -314,6 +413,15 @@ def build(data: dict) -> Path:
     info = data.get("leagues") or {}
     sections = _section_of()
     cfg, site = config.public_config(), config.site()
+    now = datetime.now(timezone.utc)
+    today = picks.day_key(now)
+    hist = history.load(site["site_url"])
+    history.update(hist, data["matches"], now)
+    settled = history.settle(hist, now)
+    if settled:
+        print(f"Historique : {settled} résultat(s) de match ajouté(s).")
+    slugs = {m["slug"] for m in data["matches"] if m["league"] in BY_CODE}
+    sim = _simulation()
     for lang in i18n.LANGS:
         t = i18n.UI[lang]
         views = [_match_view(m, lang, info, sections) for m in data["matches"] if m["league"] in BY_CODE]
@@ -342,12 +450,13 @@ def build(data: dict) -> Path:
             **common, page="matches", root="", path="index.html", groups=groups, chips=chips, sheet=sheet,
             featured=featured, lead=lead, n_matches=len(views)), encoding="utf-8")
         (out / "paris.html").write_text(env.get_template("bets.html").render(
-            **common, page="bets", likely=_likely(views, lang), root="", path="paris.html"), encoding="utf-8")
-        for page, key in (("ticket", "ticket"), ("historique", "history")):
-            (out / f"{page}.html").write_text(env.get_template("soon.html").render(
-                **common, page=page, root="", path=f"{page}.html", title=t[f"{key}_title"],
-                message=t[f"{key}_soon"], features=t[f"{key}_features"],
-                big_icon="ticket" if key == "ticket" else "history"), encoding="utf-8")
+            **common, page="bets", root="", path="paris.html", days=_paris_days(hist, today, lang, slugs),
+            today=today, tiers=list(picks.TIERS)), encoding="utf-8")
+        (out / "ticket.html").write_text(env.get_template("ticket.html").render(
+            **common, page="ticket", root="", path="ticket.html", tiers=list(picks.TIERS)), encoding="utf-8")
+        (out / "historique.html").write_text(env.get_template("history.html").render(
+            **common, page="historique", root="", path="historique.html",
+            h=_history_view(hist, today, lang, slugs), sim=sim, tiers=list(picks.TIERS)), encoding="utf-8")
         # Compte, offres Premium, pages légales
         (out / "compte.html").write_text(env.get_template("account.html").render(
             **common, page="compte", root="", path="compte.html", sheet=sheet), encoding="utf-8")
@@ -377,6 +486,10 @@ def build(data: dict) -> Path:
                   {"src": "/icons/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     data_dir = PUBLIC / "data"
-    data_dir.mkdir()
+    data_dir.mkdir(exist_ok=True)
     (data_dir / "matches.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    for lang in i18n.LANGS:
+        (data_dir / f"ticket-{lang}.json").write_text(json.dumps(
+            _ticket_data(data["matches"], lang, now), ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    history.save(hist, data_dir, now)
     return PUBLIC

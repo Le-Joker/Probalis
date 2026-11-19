@@ -199,6 +199,10 @@ def day_short(d, lang: str) -> str:
     return f"{_WEEKDAYS[lang][d.weekday()]} {d.day}"
 
 
+def weekday_short(d, lang: str) -> str:
+    return _WEEKDAYS[lang][d.weekday()]
+
+
 def day_med(d, lang: str) -> str:
     return f"{_WEEKDAYS[lang][d.weekday()]} {d.day} {_MONTHS[lang][d.month - 1]}"
 
@@ -416,10 +420,9 @@ _EXTRA = {
         "cmp_free": "Gratuit", "cmp_premium": "Premium",
         "cmp_rows": [["Analyse complète d'un match : plus de 90 marchés, cotes justes, compare ta cote (gratuit : avec un compte)", "1 par jour", "Tous les matchs"],
                      ["Probabilités dans la liste des matchs", 0, 1],
-                     ["Paris les plus probables de la semaine", 0, 1],
                      ["E-mail la veille des grands chocs", 1, 1],
                      ["Aucune publicité", 0, 1],
-                     ["Constructeur de ticket et combinés du jour (bientôt)", 0, 1],
+                     ["Les 5 paris les plus sûrs du jour (3 niveaux), coupons du jour, constructeur de coupons complet", "N°1 de chaque liste", "Tout"],
                      ["Alertes personnalisées (bientôt)", 0, 1]],
         "plans_title": "Choisis ton pass",
         "plan_week": "Pass 7 jours", "plan_month": "Pass 30 jours", "best_value": "Le plus avantageux",
@@ -498,10 +501,9 @@ _EXTRA = {
         "cmp_free": "Free", "cmp_premium": "Premium",
         "cmp_rows": [["Full match analysis: 90+ markets, fair odds, check your odds (free: with an account)", "1 a day", "Every match"],
                      ["Probabilities in the match list", 0, 1],
-                     ["The week's most likely bets", 0, 1],
                      ["Email the day before big matches", 1, 1],
                      ["No ads", 0, 1],
-                     ["Bet slip builder and daily accumulators (coming soon)", 0, 1],
+                     ["The 5 safest bets of the day (3 levels), daily accumulators, full accumulator builder", "#1 of each list", "Everything"],
                      ["Personal alerts (coming soon)", 0, 1]],
         "plans_title": "Pick your pass",
         "plan_week": "7-day pass", "plan_month": "30-day pass", "best_value": "Best value",
@@ -582,6 +584,192 @@ _JS_EXTRA = {
     },
 }
 
+# --- Paris du jour, ticket, historique (ajoutés le 19/11/2026) ---------------------------------------------
+_BETS = {
+    "fr": {
+        "bets_kicker": "Paris du jour", "bets_h1": "Les plus sûrs du jour",
+        "bets_lead": "Pour chaque niveau de risque, nos 5 paris les plus probables du jour, sur des marchés classiques que tous les bookmakers proposent. Ils sont enregistrés avant les matchs : les résultats arrivent dans l'Historique.",
+        "tiers_label": "Niveau de risque",
+        "tier_safe": "Prudent", "tier_balanced": "Équilibré", "tier_bold": "Audacieux",
+        "tier_safe_help": "Environ 7 à 8 chances sur 10 · cotes justes de 1,25 à 1,45",
+        "tier_balanced_help": "Environ 6 chances sur 10 · cotes justes de 1,45 à 1,80",
+        "tier_bold_help": "Environ 4 à 5 chances sur 10 · cotes justes de 2 à 2,80",
+        "times_ten": "≈ {n} fois sur 10",
+        "pct_explain": "80 % veut dire : sur 10 paris comme celui-ci, environ 8 passent et 2 perdent. Jamais 10 sur 10.",
+        "book_est": "≈ {o} chez un bookmaker", "add_coupon": "Ajouter au ticket", "started": "Commencé",
+        "res_won": "Gagné", "res_lost": "Perdu", "res_void": "Remboursé", "res_wait": "En attente",
+        "no_picks_day": "Pas de pari retenu ce jour-là : trop peu de matchs fiables (le football féminin et les matchs avec peu de données sont mis de côté).",
+        "no_picks": "Pas encore de paris du jour : reviens quand les prochains matchs seront annoncés.",
+        "coupons_title": "Coupons du jour",
+        "coupons_lead": "Des combinés tout prêts pour une cote d'environ 2, 3 ou 5, avec le moins de matchs possible : chaque match en plus te fait payer une marge de plus au bookmaker.",
+        "coupon_target": "Cote ≈ {n}", "coupon_meta": "{n} matchs · chance {p}",
+        "coupon_book": "Cote estimée chez un bookmaker", "coupon_fair": "cote juste {o}",
+        "coupon_load": "Mettre dans mon ticket", "no_coupons": "Pas de coupon ce jour-là.",
+        "lock_anon": "Connecte-toi gratuitement pour voir le n°1 de chaque liste.",
+        "lock_signed": "Gratuit : le n°1 de chaque liste. Premium : les 5 paris de chaque niveau et les coupons du jour.",
+        "signin_cta": "Se connecter", "coupons_lock": "Coupons du jour réservés à Premium.",
+        "est_note": "Cote bookmaker estimée = cote juste moins une marge d'environ 5 %. Vérifie toujours la vraie cote chez ton bookmaker.",
+        "see_history": "Voir l'historique",
+        "tk_swap_btn": "Remplacer", "tk_today": "Aujourd'hui",
+        "team_scores2": "{team} marque 2 buts ou plus",
+        "btts_yes_long": "Les deux équipes marquent", "btts_no_long": "Au moins une équipe ne marque pas",
+        # Ticket
+        "ticket_kicker": "Constructeur de coupons", "ticket_h1": "Mon ticket",
+        "ticket_lead": "Construis ton coupon : Probalis calcule la vraie chance qu'il passe, repère le match le plus risqué et te dit si la cote de ton bookmaker vaut le coup.",
+        "mode_label": "Mode", "mode_mine": "Mon coupon", "mode_target": "Cote cible", "mode_count": "Nb de matchs",
+        "mode_mine_help": "Ajoute tes paris (bouton + dans l'onglet Paris, sur la page d'un match, ou ci-dessous).",
+        "mode_target_help": "Donne la cote que tu veux : l'appli construit le coupon le plus solide pour l'atteindre.",
+        "mode_count_help": "Choisis le nombre de matchs et le niveau : l'appli prend les paris les plus sûrs du jour.",
+        "mine_empty": "Ton ticket est vide. Ajoute des paris avec le bouton + de l'onglet Paris, depuis la page d'un match, ou ici.",
+        "add_match": "Ajouter un pari", "pick_day": "Jour", "pick_match": "Match", "pick_bet": "Pari",
+        "add_btn": "Ajouter au ticket", "clear_all": "Tout effacer",
+        "an_your_odds": "Cote totale chez ton bookmaker (facultatif)",
+        "target_label": "Cote voulue", "count_label": "Nombre de matchs", "level_label": "Niveau", "build_btn": "Construire",
+        "same_odds_title": "Même cote, plus ou moins de matchs",
+        "same_odds_text": "À cote égale, moins de matchs = plus de chance : le bookmaker prend sa marge sur chaque sélection.",
+        "use_this": "Mettre dans mon ticket", "share_ticket": "Partager",
+        "ticket_note": "Les chances viennent de notre modèle : ce sont des estimations, pas des certitudes. Un combiné perd dès qu'une seule sélection perd.",
+        "auto_lock": "Les modes « Cote cible » et « Nombre de matchs » sont réservés à Premium.",
+        "mine_lock_anon": "Connecte-toi gratuitement pour analyser ton ticket (jusqu'à 3 matchs). Premium : jusqu'à 10 matchs.",
+        "mine_lock_free": "Gratuit : analyse jusqu'à 3 matchs. Premium : jusqu'à 10 matchs.",
+        # Historique
+        "hist_kicker": "Nos résultats, sans maquillage", "hist_h1": "Historique",
+        "hist_lead": "Chaque jour, les paris du jour et les coupons sont enregistrés avant les matchs, puis réglés automatiquement avec le score final. Rien n'est effacé.",
+        "hist_since": "Depuis le {d}", "hist_empty": "Le suivi commence aujourd'hui : les premiers résultats arriveront après les matchs.",
+        "hist_rate": "réussite", "hist_announced": "annoncé {p} en moyenne", "hist_n": "{won} gagnés sur {n}",
+        "hist_calib": "Annoncé {a} → réel {r}", "hist_too_few": "Pas encore assez de paris réglés pour juger : il en faut au moins 30 par niveau.",
+        "hist_days": "Jour par jour", "hist_coupons": "Coupons du jour", "hist_pending": "en attente",
+        "sim_title": "Simulation sur la saison 2025/26",
+        "sim_lead": "Les mêmes règles appliquées après coup à toute la saison 2025/26 ({n} matchs, 10 championnats), sans connaître les résultats à l'avance. C'est une simulation, pas un historique réel.",
+        "sim_rate": "{r} de réussite pour {a} annoncés ({n} paris)",
+        "sim_coupon": "Coupon cote ≈ {t} : {r} de réussite pour {a} annoncés ({n} coupons)",
+        "sim_roi": "Gain ou perte à la cote estimée du bookmaker : {r}",
+        "sim_note": "Les chances viennent du modèle calé sur les cotes moyennes d'avant-match. Le gain ou la perte est calculé comme si chaque pari avait été joué à la cote estimée du bookmaker (cote juste moins 5 %) : même quand la réussite colle à la chance annoncée, cette marge fait perdre un peu d'argent à long terme.",
+    },
+    "en": {
+        "bets_kicker": "Today's bets", "bets_h1": "Today's safest bets",
+        "bets_lead": "For each risk level, our 5 most likely bets of the day, on standard markets every bookmaker offers. They're recorded before kick-off: results show up in History.",
+        "tiers_label": "Risk level",
+        "tier_safe": "Safe", "tier_balanced": "Balanced", "tier_bold": "Bold",
+        "tier_safe_help": "About 7 to 8 chances in 10 · fair odds 1.25 to 1.45",
+        "tier_balanced_help": "About 6 chances in 10 · fair odds 1.45 to 1.80",
+        "tier_bold_help": "About 4 to 5 chances in 10 · fair odds 2.00 to 2.80",
+        "times_ten": "≈ {n} in 10",
+        "pct_explain": "80% means: out of 10 bets like this one, about 8 win and 2 lose. Never 10 out of 10.",
+        "book_est": "≈ {o} at a bookmaker", "add_coupon": "Add to slip", "started": "Started",
+        "res_won": "Won", "res_lost": "Lost", "res_void": "Void", "res_wait": "Pending",
+        "no_picks_day": "No pick that day: too few reliable matches (women's football and matches with little data are left out).",
+        "no_picks": "No bets of the day yet: come back when the next matches are announced.",
+        "coupons_title": "Accumulators of the day",
+        "coupons_lead": "Ready-made accas at odds of about 2, 3 or 5, with as few matches as possible: every extra match makes you pay the bookmaker's margin once more.",
+        "coupon_target": "Odds ≈ {n}", "coupon_meta": "{n} matches · {p} chance",
+        "coupon_book": "Estimated bookmaker odds", "coupon_fair": "fair odds {o}",
+        "coupon_load": "Load into my slip", "no_coupons": "No accumulator that day.",
+        "lock_anon": "Sign in for free to see the #1 of each list.",
+        "lock_signed": "Free: the #1 of each list. Premium: all 5 bets of each level and the daily accumulators.",
+        "signin_cta": "Sign in", "coupons_lock": "Daily accumulators are for Premium members.",
+        "est_note": "Estimated bookmaker odds = fair odds minus a margin of about 5%. Always check the real price at your bookmaker.",
+        "see_history": "See history",
+        "tk_swap_btn": "Swap it", "tk_today": "Today",
+        "team_scores2": "{team} to score 2+",
+        "btts_yes_long": "Both teams to score", "btts_no_long": "At least one team fails to score",
+        "ticket_kicker": "Accumulator builder", "ticket_h1": "My slip",
+        "ticket_lead": "Build your accumulator: Probalis works out the real chance it wins, spots the riskiest match and tells you whether your bookmaker's price is worth it.",
+        "mode_label": "Mode", "mode_mine": "My slip", "mode_target": "Target odds", "mode_count": "No. of matches",
+        "mode_mine_help": "Add your bets (+ button in the Bets tab, on a match page, or below).",
+        "mode_target_help": "Enter the odds you want: the app builds the most solid accumulator to reach them.",
+        "mode_count_help": "Pick the number of matches and the level: the app takes the day's safest bets.",
+        "mine_empty": "Your slip is empty. Add bets with the + button in the Bets tab, from a match page, or here.",
+        "add_match": "Add a bet", "pick_day": "Day", "pick_match": "Match", "pick_bet": "Bet",
+        "add_btn": "Add to slip", "clear_all": "Clear all",
+        "an_your_odds": "Total odds at your bookmaker (optional)",
+        "target_label": "Target odds", "count_label": "Number of matches", "level_label": "Level", "build_btn": "Build",
+        "same_odds_title": "Same odds, more or fewer matches",
+        "same_odds_text": "At equal odds, fewer matches = more chance: the bookmaker takes its margin on every selection.",
+        "use_this": "Load into my slip", "share_ticket": "Share",
+        "ticket_note": "Chances come from our model: they're estimates, not certainties. An accumulator loses as soon as one selection loses.",
+        "auto_lock": "“Target odds” and “Number of matches” are for Premium members.",
+        "mine_lock_anon": "Sign in for free to analyse your slip (up to 3 matches). Premium: up to 10 matches.",
+        "mine_lock_free": "Free: analysis of up to 3 matches. Premium: up to 10 matches.",
+        "hist_kicker": "Our results, no make-up", "hist_h1": "History",
+        "hist_lead": "Every day, the bets of the day and the accumulators are recorded before kick-off, then settled automatically with the final score. Nothing is deleted.",
+        "hist_since": "Since {d}", "hist_empty": "Tracking starts today: the first results will come in after the matches.",
+        "hist_rate": "won", "hist_announced": "{p} announced on average", "hist_n": "{won} won out of {n}",
+        "hist_calib": "Announced {a} → actual {r}", "hist_too_few": "Not enough settled bets to judge yet: we need at least 30 per level.",
+        "hist_days": "Day by day", "hist_coupons": "Accumulators of the day", "hist_pending": "pending",
+        "sim_title": "Simulation on the 2025/26 season",
+        "sim_lead": "The same rules applied afterwards to the whole 2025/26 season ({n} matches, 10 leagues), without knowing the results in advance. It's a simulation, not a real track record.",
+        "sim_rate": "{r} won for {a} announced ({n} bets)",
+        "sim_coupon": "Accumulator at odds ≈ {t}: {r} won for {a} announced ({n} accas)",
+        "sim_roi": "Profit or loss at the estimated bookmaker odds: {r}",
+        "sim_note": "The chances come from the model calibrated on the average pre-match odds. Profit or loss is computed as if each bet had been placed at the estimated bookmaker odds (fair odds minus 5%): even when the hit rate matches the announced chance, that margin loses a little money in the long run.",
+    },
+}
+
+_BETS_JS = {
+    "fr": {
+        "tk_added": "Ajouté au ticket ({n})", "tk_replaced": "Pari remplacé pour ce match ({n})",
+        "tk_full": "Ticket plein : 10 matchs au maximum.", "tk_started": "Ce match a déjà commencé.",
+        "tk_loaded": "Coupon mis dans ton ticket", "tk_removed": "Retiré du ticket",
+        "tk_chance": "Chance que le ticket passe", "tk_times": "≈ {n} fois sur 10", "tk_times100": "≈ {n} fois sur 100",
+        "tk_fair": "Cote juste", "tk_book": "Cote estimée chez un bookmaker",
+        "tk_weak": "Maillon faible : {l} ({p}).",
+        "tk_swap": "Remplace-le par « {l} » ({p}) : ta chance passe à {c}, pour une cote d'environ {o}.",
+        "tk_drop": "Sans ce match : chance {c}, cote d'environ {o}.",
+        "tk_n": "{n} matchs", "tk_1": "1 match", "tk_k": "{k} matchs", "tk_kc": "chance {p}",
+        "tk_share_head": "Mon ticket Probalis", "tk_share_chance": "Chance estimée : {p} · cote juste {f}",
+        "tk_none": "Pas assez de matchs ce jour-là pour ce coupon. Essaie un autre jour ou une autre cote.",
+        "tk_low": "peu de données", "tk_lock_more": "Gratuit : analyse jusqu'à 3 matchs. Passe Premium pour aller jusqu'à 10.",
+        "tk_choose": "Choisir…", "tk_today": "Aujourd'hui", "tk_tomorrow": "Demain",
+        "tk_verdict_none": "Entre la cote totale de ton bookmaker pour savoir si elle vaut le coup.",
+        "tk_loading": "Chargement des matchs…", "tk_load_err": "Impossible de charger les matchs. Réessaie.",
+        "tk_cleared": "Ticket vidé", "tk_started_short": "commencé", "tk_remove": "Retirer",
+        "tk_use": "Mettre dans mon ticket", "tk_same_title": "Même cote, plus ou moins de matchs",
+        "tk_same_text": "À cote égale, moins de matchs = plus de chance : le bookmaker prend sa marge sur chaque sélection.",
+        "tk_bad_target": "Entre une cote entre 1,5 et 100, par exemple 3.",
+    },
+    "en": {
+        "tk_added": "Added to slip ({n})", "tk_replaced": "Bet replaced for this match ({n})",
+        "tk_full": "Slip full: 10 matches at most.", "tk_started": "This match has already started.",
+        "tk_loaded": "Accumulator loaded into your slip", "tk_removed": "Removed from slip",
+        "tk_chance": "Chance the slip wins", "tk_times": "≈ {n} in 10", "tk_times100": "≈ {n} in 100",
+        "tk_fair": "Fair odds", "tk_book": "Estimated bookmaker odds",
+        "tk_weak": "Weakest link: {l} ({p}).",
+        "tk_swap": "Swap it for “{l}” ({p}): your chance goes up to {c}, at odds of about {o}.",
+        "tk_drop": "Without this match: {c} chance, odds of about {o}.",
+        "tk_n": "{n} matches", "tk_1": "1 match", "tk_k": "{k} matches", "tk_kc": "{p} chance",
+        "tk_share_head": "My Probalis slip", "tk_share_chance": "Estimated chance: {p} · fair odds {f}",
+        "tk_none": "Not enough matches that day for this accumulator. Try another day or other odds.",
+        "tk_low": "little data", "tk_lock_more": "Free: analysis of up to 3 matches. Go Premium for up to 10.",
+        "tk_choose": "Choose…", "tk_today": "Today", "tk_tomorrow": "Tomorrow",
+        "tk_verdict_none": "Enter your bookmaker's total odds to see whether they're worth it.",
+        "tk_loading": "Loading matches…", "tk_load_err": "Couldn't load the matches. Try again.",
+        "tk_cleared": "Slip cleared", "tk_started_short": "started", "tk_remove": "Remove",
+        "tk_use": "Load into my slip", "tk_same_title": "Same odds, more or fewer matches",
+        "tk_same_text": "At equal odds, fewer matches = more chance: the bookmaker takes its margin on every selection.",
+        "tk_bad_target": "Enter odds between 1.5 and 100, for example 3.",
+    },
+}
+
 for _lang in LANGS:
     UI[_lang].update(_EXTRA[_lang])
+    UI[_lang].update(_BETS[_lang])
     _JS[_lang].update(_JS_EXTRA[_lang])
+    _JS[_lang].update(_BETS_JS[_lang])
+
+
+def pick_label(key: str, sel: str, line: float | None, lang: str, home: str, away: str) -> str:
+    """Libellé clair d'un pari classique : « Victoire Arsenal », « Plus de 1,5 buts », « Chelsea marque »…"""
+    t = UI[lang]
+    if key == "1x2":
+        return t["draw_long"] if sel == "X" else t["home_win"].format(team=home if sel == "1" else away)
+    if key in ("tt1", "tt2") and sel == "over" and line in (0.5, 1.5):
+        return t["team_scores" if line == 0.5 else "team_scores2"].format(team=home if key == "tt1" else away)
+    if key == "ou":
+        return f"{selection_label(key, sel, line, lang, home, away)} {t['goals_word']}"
+    if key == "btts":
+        return t["btts_yes_long"] if sel == "yes" else t["btts_no_long"]
+    if key == "dnb":
+        return f"{selection_label(key, sel, line, lang, home, away)} ({t['dnb_short']})"
+    return selection_label(key, sel, line, lang, home, away)
+

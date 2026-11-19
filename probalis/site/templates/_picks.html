@@ -1,0 +1,47 @@
+{# Cartes des paris du jour (onglet Paris et Historique). À importer « with context ». #}
+{% from "_card.html" import crest %}
+{% macro res_badge(res, score=none) %}<span class="pk-res {{ res or 'wait' }}">{{ icon({'won': 'check', 'lost': 'x', 'void': 'equal'}.get(res, 'clock'), 12, 3) }}{{ t['res_' ~ (res or 'wait')] }}{% if score %} · {{ score[0] }}-{{ score[1] }}{% endif %}</span>{% endmacro %}
+
+{% macro pick_card(e, first=false, hist=false) %}
+<div class="pick{% if first %} free1{% endif %}{% if e.res %} done res-{{ e.res }}{% endif %}{% if hist %} hist{% endif %}" data-ko="{{ e.match.kickoff }}">
+  {% if e.match.slug and not e.res %}<a class="pk-main" href="{{ root }}match/{{ e.match.slug }}.html">{% else %}<span class="pk-main">{% endif %}
+    <span class="ring">
+      <svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true"><circle class="trk" cx="27" cy="27" r="23" fill="none" stroke-width="6"/><circle class="val" cx="27" cy="27" r="23" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ e.dash }}" transform="rotate(-90 27 27)"/></svg>
+      <b>{{ e.pct }}</b>
+    </span>
+    <span class="pk-txt">
+      <b>{{ e.label }}</b>
+      <small>{{ e.times }} · {{ e.market }}</small>
+      <span class="pk-match">{{ crest(e.match.home_crest, 's16') }}{{ crest(e.match.away_crest, 's16') }}<span>{{ e.match.home }} – {{ e.match.away }} · <span data-dshort="{{ e.match.kickoff }}">{{ e.match.day_short }}</span> <time data-ko="{{ e.match.kickoff }}">{{ e.match.kickoff[11:16] }}</time></span></span>
+    </span>
+    <span class="pk-fair"><small>{{ t.fair_odds }}</small><span class="pill">{{ e.fair }}</span></span>
+  {% if e.match.slug and not e.res %}</a>{% else %}</span>{% endif %}
+  {% if e.res or hist %}{{ res_badge(e.res, e.match.score) }}{% else %}
+  <span class="pk-started">{{ icon('clock', 12, 2.6) }}{{ t.started }}</span>
+  <button class="pk-add js-only" type="button" data-add='{{ e.add|tojson }}' aria-pressed="false" aria-label="{{ t.add_coupon }} : {{ e.label }}" title="{{ t.add_coupon }}">{{ icon('plus', 20, 2.6) }}{{ icon('check', 20, 2.6) }}</button>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro coupon_card(cp, hist=false) %}
+<article class="dcoupon{% if cp.res %} done{% endif %}{% if hist %} hist{% endif %}">
+  <div class="dc-head">
+    <span class="dc-target">{{ icon('ticket', 16, 2.2) }}{{ cp.title }}</span>
+    <span class="dc-meta">{{ cp.meta }}</span>
+    {% if cp.res or hist %}{{ res_badge(cp.res) }}{% endif %}
+  </div>
+  <ol class="dc-legs">
+  {% for e in cp.legs %}
+    <li data-ko="{{ e.match.kickoff }}">
+      <span class="dc-l"><b>{{ e.label }}</b><small>{{ e.match.home }} – {{ e.match.away }}{% if e.match.score %} ({{ e.match.score[0] }}-{{ e.match.score[1] }}){% endif %} · <span data-dshort="{{ e.match.kickoff }}">{{ e.match.day_short }}</span> <time data-ko="{{ e.match.kickoff }}">{{ e.match.kickoff[11:16] }}</time></small></span>
+      <span class="dc-p">{{ e.pct }}</span>
+      {% if e.res %}<span class="dc-r {{ e.res }}" title="{{ t['res_' ~ e.res] }}">{{ icon({'won': 'check', 'lost': 'x', 'void': 'equal'}[e.res], 13, 3) }}</span>{% endif %}
+    </li>
+  {% endfor %}
+  </ol>
+  <div class="dc-foot">
+    <span class="dc-odds"><small>{{ t.coupon_book }}</small><b>≈ {{ cp.book }}</b><small>{{ cp.fair }} · {{ cp.times }}</small></span>
+    {% if not cp.res and not hist %}<button class="btn ghost dc-load js-only" type="button" data-legs='{{ cp.add|tojson }}'>{{ icon('plus', 18, 2.4) }}{{ t.coupon_load }}</button>{% endif %}
+  </div>
+</article>
+{% endmacro %}

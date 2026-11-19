@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="intro">
+  <div class="kicker">{{ t.ticket_kicker }}</div>
+  <h1 class="h1">{{ t.ticket_h1 }}</h1>
+  <p class="lead">{{ t.ticket_lead }}</p>
+</div>
+
+<noscript><p class="empty">{{ t.mine_empty }}</p></noscript>
+<div class="tk js-only" id="tk" data-src="/data/ticket-{{ lang }}.json">
+  <div class="seg modes" id="tk-modes" role="group" aria-label="{{ t.mode_label }}">
+    <button type="button" data-mode="mine" aria-pressed="true">{{ icon('pen', 16, 2.4) }}<span>{{ t.mode_mine }}</span></button>
+    <button type="button" data-mode="target" aria-pressed="false">{{ icon('target', 16, 2.4) }}<span>{{ t.mode_target }}</span></button>
+    <button type="button" data-mode="count" aria-pressed="false">{{ icon('hash', 16, 2.4) }}<span>{{ t.mode_count }}</span></button>
+  </div>
+
+  {# ---- Mon coupon ---- #}
+  <section class="tk-panel" data-panel="mine" aria-label="{{ t.mode_mine }}">
+    <p class="tier-help">{{ t.mode_mine_help }}</p>
+    <div class="tk-legs" id="tk-legs" aria-live="polite"></div>
+    <p class="empty" id="tk-empty" hidden>{{ t.mine_empty }}<br><a class="link" href="{{ root }}paris.html">{{ t.bets_h1 }}{{ icon('chev-right', 14, 2.6) }}</a></p>
+    <div class="tk-actions">
+      <button class="btn ghost" type="button" id="tk-open" aria-controls="tk-picker">{{ icon('plus', 18, 2.4) }}{{ t.add_match }}</button>
+      <button class="btn ghost" type="button" id="tk-clear" hidden>{{ icon('trash', 18, 2.2) }}{{ t.clear_all }}</button>
+    </div>
+    <div class="card tk-picker" id="tk-picker" hidden>
+      <label class="field">{{ t.pick_day }}<select id="tk-day"></select></label>
+      <label class="field">{{ t.pick_match }}<select id="tk-match"></select></label>
+      <label class="field">{{ t.pick_bet }}<select id="tk-bet"></select></label>
+      <p class="cmp-chance" id="tk-bet-info"></p>
+      <button class="btn" type="button" id="tk-add">{{ icon('plus', 18, 2.4) }}{{ t.add_btn }}</button>
+    </div>
+
+    <p class="list-lock lock-anon">{{ icon('lock', 16, 2.4) }}<span>{{ t.mine_lock_anon }}</span><a href="{{ root }}compte.html">{{ t.signin_cta }}</a></p>
+    <section class="card tk-an" id="tk-an" aria-live="polite" hidden>
+      <p class="list-lock" id="tk-lock-more" hidden>{{ icon('lock', 16, 2.4) }}<span>{{ t.mine_lock_free }}</span><a href="{{ root }}premium.html">{{ t.lock_cta }}</a></p>
+      <div class="an-top">
+        <span id="tk-ring"></span>
+        <span class="an-main"><small>{{ t.ticket_h1 }} · <span id="tk-count"></span></small><b id="tk-times"></b><span>{{ t.pct_explain }}</span></span>
+      </div>
+      <div class="an-grid">
+        <div><small>{{ t.fair_odds }}</small><b id="tk-fair"></b></div>
+        <div><small>{{ t.coupon_book }}</small><b id="tk-book"></b></div>
+      </div>
+      <label class="field an-odds">{{ t.an_your_odds }}
+        <input id="tk-odds" type="text" inputmode="decimal" autocomplete="off" placeholder="{{ t.compare_placeholder }}" maxlength="8">
+      </label>
+      <div class="verdict" id="tk-verdict" role="status" hidden><span class="v-ic">{{ icon('check', 18, 2.6) }}{{ icon('equal', 18, 2.6) }}{{ icon('x', 18, 2.6) }}</span><span class="v-txt"></span></div>
+      <div class="wk-box" id="tk-weak" hidden>
+        <p class="wk-txt"></p>
+        <p class="wk-swap" hidden><span></span><button class="btn ghost" type="button" data-add="" aria-pressed="false">{{ icon('zap', 16, 2.4) }}{{ t.tk_swap_btn }}</button></p>
+      </div>
+      <div class="same-box" id="tk-same-box" hidden>
+        <h3>{{ t.same_odds_title }}</h3>
+        <p>{{ t.same_odds_text }}</p>
+        <ul class="same" id="tk-same"></ul>
+      </div>
+      <button class="btn" type="button" id="tk-share" hidden>{{ icon('share', 18, 2.2) }}{{ t.share_ticket }}</button>
+    </section>
+  </section>
+
+  {# ---- Cote cible ---- #}
+  <section class="tk-panel" data-panel="target" aria-label="{{ t.mode_target }}" hidden>
+    <p class="tier-help">{{ t.mode_target_help }}</p>
+    <section class="lock-card auto-lock">
+      <span class="lock-ic">{{ icon('lock', 20, 2.2) }}</span>
+      <h3>{{ t.mode_target }}</h3>
+      <p>{{ t.auto_lock }}</p>
+      <a class="btn" href="{{ root }}premium.html">{{ icon('crown', 18, 2.2) }}{{ t.lock_cta }}</a>
+    </section>
+    <div class="card tk-form">
+      <div class="cmp-grid">
+        <label class="field">{{ t.pick_day }}<select id="tg-day"></select></label>
+        <label class="field">{{ t.target_label }}<input id="tg-odds" type="text" inputmode="decimal" autocomplete="off" value="3" maxlength="6"></label>
+      </div>
+      <div class="quick" id="tg-quick">
+      {% for o in (2, 3, 5, 10) %}<button class="chip" type="button" data-odds="{{ o }}">{{ o }}</button>{% endfor %}
+      </div>
+      <button class="btn" type="button" id="tg-go">{{ icon('target', 18, 2.4) }}{{ t.build_btn }}</button>
+    </div>
+    <div id="tg-out" aria-live="polite"></div>
+  </section>
+
+  {# ---- Nombre de matchs ---- #}
+  <section class="tk-panel" data-panel="count" aria-label="{{ t.mode_count }}" hidden>
+    <p class="tier-help">{{ t.mode_count_help }}</p>
+    <section class="lock-card auto-lock">
+      <span class="lock-ic">{{ icon('lock', 20, 2.2) }}</span>
+      <h3>{{ t.mode_count }}</h3>
+      <p>{{ t.auto_lock }}</p>
+      <a class="btn" href="{{ root }}premium.html">{{ icon('crown', 18, 2.2) }}{{ t.lock_cta }}</a>
+    </section>
+    <div class="card tk-form">
+      <div class="cmp-grid">
+        <label class="field">{{ t.pick_day }}<select id="ct-day"></select></label>
+        <label class="field">{{ t.count_label }}<select id="ct-n">{% for n in range(2, 11) %}<option value="{{ n }}"{% if n == 3 %} selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+      </div>
+      <div class="seg tiers" id="ct-tier" role="group" aria-label="{{ t.level_label }}">
+      {% for k in tiers %}
+        <button type="button" data-tier="{{ k }}" aria-pressed="{{ 'true' if loop.first else 'false' }}"><i class="tdot {{ k }}" aria-hidden="true"></i>{{ t['tier_' ~ k] }}</button>
+      {% endfor %}
+      </div>
+      <button class="btn" type="button" id="ct-go">{{ icon('hash', 18, 2.4) }}{{ t.build_btn }}</button>
+    </div>
+    <div id="ct-out" aria-live="polite"></div>
+  </section>
+
+  <p class="note pct-note">{{ icon('info', 15, 2.2) }}<span>{{ t.ticket_note }} {{ t.est_note }}</span></p>
+</div>
+{% endblock %}

@@ -3,7 +3,7 @@ const VERSION = '__VERSION__';
 const CORE = `probalis-core-${VERSION}`;
 const PAGES = 'probalis-pages';
 const CRESTS = 'probalis-crests';
-const PRECACHE = ['/assets/style.css', '/assets/app.js', '/manifest.webmanifest',
+const PRECACHE = [`/assets/style.css?v=${VERSION}`, `/assets/app.js?v=${VERSION}`, '/manifest.webmanifest',
   '/icons/icone-192.png', '/icons/probalis-icone.svg', '__FONTS__'];
 const SLOW_MS = 3500;   // au-delà, on montre la dernière version enregistrée et on met à jour en arrière-plan
 const MAX_PAGES = 40;
@@ -75,5 +75,13 @@ self.addEventListener('fetch', (e) => {
   }
 
   if (url.pathname.startsWith('/data/')) return;  // données : toujours fraîches
-  e.respondWith(caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req)));
+  // Styles, scripts, polices : la version demandée (?v=…) exactement ; une ancienne version seulement hors connexion
+  // (sinon, juste après une mise à jour, la nouvelle page s'afficherait avec les anciens styles).
+  e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+    if (res.ok && res.type === 'basic' && url.search) {
+      const copy = res.clone();
+      e.waitUntil(caches.open(CORE).then((c) => c.put(req, copy)));
+    }
+    return res;
+  }).catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || Response.error()))));
 });

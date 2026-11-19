@@ -109,7 +109,8 @@
     </div>
     <p class="cmp-chance" id="cmp-chance"></p>
     <div class="verdict" id="cmp-verdict" role="status" aria-live="polite" hidden><span class="v-ic">{{ icon('check', 18, 2.6) }}{{ icon('equal', 18, 2.6) }}{{ icon('x', 18, 2.6) }}</span><span class="v-txt"></span></div>
-    <script type="application/json" id="cmp-data">{{ {'items': m.compare['items'], 'source': m.compare.source}|tojson }}</script>
+    <button class="btn ghost cmp-add" type="button" id="cmp-add" data-add="" aria-pressed="false">{{ icon('plus', 18, 2.4) }}{{ t.add_coupon }}</button>
+    <script type="application/json" id="cmp-data">{{ {'items': m.compare['items'], 'source': m.compare.source, 'mid': m.id, 'h': m.home.name, 'a': m.away.name, 'ko': m.kickoff, 's': m.slug}|tojson }}</script>
   </section>
 
   <section class="card locked">

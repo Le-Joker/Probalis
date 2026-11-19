@@ -999,8 +999,9 @@
     var render = function () {
       var f = Free.get();
       var m = f && f.m;
-      $$('a.mcard, a.pick, a.featured', scope).forEach(function (a) {
-        a.classList.toggle('free-ok', !!m && slugOf(a.getAttribute('href')) === m);
+      $$('a.mcard, a.featured, .pick', scope).forEach(function (a) {
+        var link = a.matches('a') ? a : a.querySelector('a.pk-main');
+        a.classList.toggle('free-ok', !!m && !!link && slugOf(link.getAttribute('href')) === m);
       });
       if (!card) return;
       var mine = !!m && m === slug;
@@ -1025,6 +1026,604 @@
     });
   };
 
+  // =====================================================================================================
+  // Ticket : enregistré sur le téléphone, rempli depuis l'onglet Paris, les pages de match et l'onglet Ticket
+  // =====================================================================================================
+  var MARGIN = 0.05;     // marge moyenne d'un bookmaker sur un marché classique
+  var MAX_LEGS = 10;
+  var FREE_LEGS = 3;
+  var TIER_RANGE = { safe: [0.68, 0.80], balanced: [0.55, 0.68], bold: [0.36, 0.50] };
+  var FAM = { '1x2': 'result', dc: 'dc', dnb: 'result', ou: 'goals', btts: 'btts', tt1: 'team', tt2: 'team' };
+  var nf2 = new Intl.NumberFormat(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var oddsTxt = function (x) { return nf2.format(x); };
+  var pctTxt = function (p) {
+    var v = Math.round(Math.min(p, 0.99) * 100);
+    if (p > 0 && v < 1) return lang === 'fr' ? '<1 %' : '<1%';
+    return lang === 'fr' ? v + ' %' : v + '%';
+  };
+  var timesTxt = function (p) {
+    if (p >= 0.095) return fmt(T.tk_times, { n: Math.max(1, Math.min(9, Math.round(p * 10))) });
+    return fmt(T.tk_times100, { n: Math.max(1, Math.round(p * 100)) });
+  };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+  var svg = function (d, size, sw) {
+    return '<svg class="ic" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' +
+      sw + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + d + '</svg>';
+  };
+  var IC_X = svg('<path d="M6 6l12 12M18 6 6 18"/>', 18, 2.6);
+  var IC_PLUS = svg('<path d="M12 5v14M5 12h14"/>', 18, 2.6);
+  var RING_C = 2 * Math.PI * 23;
+  var ringHtml = function (p, cls) {
+    var shown = Math.min(p, 0.99);
+    return '<span class="ring' + (cls ? ' ' + cls : '') + '"><svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true">' +
+      '<circle class="trk" cx="27" cy="27" r="23" fill="none" stroke-width="6"/><circle class="val" cx="27" cy="27" r="23" fill="none" ' +
+      'stroke-width="6" stroke-linecap="round" stroke-dasharray="' + (RING_C * shown).toFixed(1) + ' ' + RING_C.toFixed(1) +
+      '" transform="rotate(-90 27 27)"/></svg><b>' + pctTxt(p) + '</b></span>';
+  };
+  var whenTxt = function (ko) { var d = new Date(ko); return shortDay(d) + ' ' + F.time.format(d); };
+
+  var Coupon = {
+    KEY: 'pb-coupon',
+    fns: [],
+    get: function () {
+      var legs = [];
+      try { legs = JSON.parse(local.get(Coupon.KEY) || '[]'); } catch (e) {}
+      if (!Array.isArray(legs)) return [];
+      var old = Date.now() - 3 * 864e5;  // matchs joués il y a plus de 3 jours : retirés tout seuls
+      return legs.filter(function (l) { return l && l.id && l.mid && l.p > 0 && new Date(l.ko).getTime() > old; });
+    },
+    set: function (legs) { local.set(Coupon.KEY, JSON.stringify(legs)); Coupon.badge(); Coupon.emit(); },
+    has: function (id) { return Coupon.get().some(function (l) { return l.id === id; }); },
+    add: function (leg) {
+      if (new Date(leg.ko).getTime() <= Date.now()) { toast(T.tk_started); return false; }
+      var legs = Coupon.get();
+      var i = legs.map(function (l) { return l.mid; }).indexOf(leg.mid);
+      if (i >= 0) {  // un seul pari par match : le nouveau remplace l'ancien
+        legs[i] = leg;
+        Coupon.set(legs);
+        toast(fmt(T.tk_replaced, { n: legs.length }));
+        return true;
+      }
+      if (legs.length >= MAX_LEGS) { toast(T.tk_full); return false; }
+      legs.push(leg);
+      Coupon.set(legs);
+      toast(fmt(T.tk_added, { n: legs.length }));
+      return true;
+    },
+    remove: function (id, quiet) {
+      Coupon.set(Coupon.get().filter(function (l) { return l.id !== id; }));
+      if (!quiet) toast(T.tk_removed);
+    },
+    load: function (legs) {
+      var now = Date.now();
+      Coupon.set(legs.filter(function (l) { return new Date(l.ko).getTime() > now; }).slice(0, MAX_LEGS));
+      toast(T.tk_loaded);
+    },
+    badge: function () {
+      var n = Coupon.get().length;
+      $$('.tabbar a[data-tab="ticket"]').forEach(function (a) {
+        if (n) a.setAttribute('data-count', n); else a.removeAttribute('data-count');
+      });
+    },
+    on: function (fn, alive) { Coupon.fns.push({ fn: fn, alive: alive }); },
+    emit: function () {
+      Coupon.fns = Coupon.fns.filter(function (l) { return l.alive(); });
+      Coupon.fns.forEach(function (l) { l.fn(); });
+    },
+    stats: function (legs) {
+      var p = 1, fair = 1;
+      legs.forEach(function (l) { p *= l.p; fair *= l.fair; });
+      return { p: p, fair: fair, book: fair / Math.pow(1 + MARGIN, legs.length) };
+    }
+  };
+  win.addEventListener('storage', function (e) { if (e.key === Coupon.KEY) { Coupon.badge(); Coupon.emit(); } });
+
+  var markAdded = function (scope) {
+    var ids = Coupon.get().map(function (l) { return l.id; });
+    $$('button[data-add]', scope).forEach(function (b) {
+      var on = ids.indexOf(b.dataset.id) >= 0;
+      b.classList.toggle('in', on);
+      b.setAttribute('aria-pressed', on);
+    });
+  };
+
+  // Boutons « + » (un pari) et « Mettre dans mon ticket » (un coupon entier), partout sur le site
+  doc.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-add]');
+    if (b) {
+      e.preventDefault();
+      var leg;
+      try { leg = JSON.parse(b.dataset.add); } catch (err) { return; }
+      if (Coupon.has(leg.id)) Coupon.remove(leg.id); else Coupon.add(leg);
+      return;
+    }
+    var c = e.target.closest('button[data-legs]');
+    if (c) {
+      e.preventDefault();
+      try { Coupon.load(JSON.parse(c.dataset.legs)); } catch (err) {}
+    }
+  });
+
+  // ---------- Calcul des coupons (mêmes règles que probalis/site/picks.py) ----------
+  var candsOf = function (m) {
+    return m.c.map(function (c) {
+      return { id: m.id + '|' + c[0] + '|' + (c[1] == null ? '' : c[1]) + '|' + c[2], mid: m.id, key: c[0], line: c[1], sel: c[2],
+        p: c[3], fair: c[4], l: c[5], m: c[6], h: m.h, a: m.a, ko: m.k, s: m.s };
+    });
+  };
+  var openMatches = function (data, day) {
+    var now = Date.now();
+    return data.matches.filter(function (m) { return (!day || m.d === day) && new Date(m.k).getTime() > now; });
+  };
+  var tierPicks = function (ms, range, n) {
+    var pool = [];
+    ms.forEach(function (m) {
+      if (!m.e) return;
+      candsOf(m).forEach(function (c) {
+        if (c.p >= range[0] && c.p <= range[1]) pool.push({ s: c.p + (m.q === 'high' ? 0.015 : 0) - (c.sel === '12' ? 0.01 : 0), c: c });
+      });
+    });
+    pool.sort(function (a, b) { return b.s - a.s; });
+    var used = {}, fam = {}, out = [], max = Math.max(2, Math.ceil(n * 0.4));
+    for (var i = 0; i < pool.length && out.length < n; i++) {
+      var c = pool[i].c, f = FAM[c.key];
+      if (used[c.mid] || (fam[f] || 0) >= max) continue;
+      used[c.mid] = 1;
+      fam[f] = (fam[f] || 0) + 1;
+      out.push(c);
+    }
+    return out.sort(function (a, b) { return a.ko < b.ko ? -1 : 1; });
+  };
+  // Coupon de k matchs dont la cote bookmaker estimée tombe près de la cible, avec des sélections équilibrées
+  var buildCoupon = function (pool, target, k, conf) {
+    var mids = {};
+    pool.forEach(function (c) { mids[c.mid] = 1; });
+    if (Object.keys(mids).length < k) return null;
+    var goal = Math.log(target * 1.04);
+    var lf = Math.log(Math.pow(target * 1.04 * Math.pow(1 + MARGIN, k), 1 / k));
+    var lc = pool.map(function (c) {
+      var d = Math.log(c.fair) - lf;
+      return d * d + (conf[c.mid] !== 'high' ? 0.02 : 0) + (c.sel === '12' ? 0.03 : 0);
+    });
+    var lfair = pool.map(function (c) { return Math.log(c.fair); });
+    var best = {};
+    pool.forEach(function (c, i) { if (best[c.mid] === undefined || lc[i] < lc[best[c.mid]]) best[c.mid] = i; });
+    var legs = Object.keys(best).map(function (m) { return best[m]; }).sort(function (a, b) { return lc[a] - lc[b]; }).slice(0, k);
+    var famCount = function (idx) { var f = {}; idx.forEach(function (i) { var x = FAM[pool[i].key]; f[x] = (f[x] || 0) + 1; }); return f; };
+    var costOf = function (tot, lcs, dup) { return 6 * Math.abs(tot - k * Math.log(1 + MARGIN) - goal) + lcs + 0.04 * dup; };
+    var tot = 0, lcs = 0;
+    legs.forEach(function (i) { tot += lfair[i]; lcs += lc[i]; });
+    var fams = famCount(legs);
+    var dupOf = function (f) { var d = 0; Object.keys(f).forEach(function (x) { if (f[x] > 1) d += f[x] - 1; }); return d; };
+    var cur = costOf(tot, lcs, dupOf(fams));
+    for (var it = 0; it < 60; it++) {
+      var imp = null;
+      for (var a = 0; a < k; a++) {
+        var i0 = legs[a], f0 = FAM[pool[i0].key];
+        var others = {};
+        legs.forEach(function (i, j) { if (j !== a) others[pool[i].mid] = 1; });
+        var baseDup = dupOf(fams) - ((fams[f0] || 0) > 1 ? 1 : 0);
+        for (var q = 0; q < pool.length; q++) {
+          if (q === i0 || others[pool[q].mid]) continue;
+          var fq = FAM[pool[q].key];
+          var cntq = (fams[fq] || 0) - (fq === f0 ? 1 : 0);
+          var dup = baseDup + (cntq >= 1 ? 1 : 0);
+          var t = costOf(tot - lfair[i0] + lfair[q], lcs - lc[i0] + lc[q], dup);
+          if (t < cur - 1e-9 && (!imp || t < imp[0])) imp = [t, a, q];
+        }
+      }
+      if (!imp) break;
+      var old = legs[imp[1]];
+      tot += lfair[imp[2]] - lfair[old];
+      lcs += lc[imp[2]] - lc[old];
+      legs[imp[1]] = imp[2];
+      fams = famCount(legs);
+      cur = imp[0];
+    }
+    var out = legs.map(function (i) { return pool[i]; });
+    var st = Coupon.stats(out);
+    if (st.book < 0.9 * target || st.book > 1.35 * target) return null;
+    return out.sort(function (x, y) { return x.ko < y.ko ? -1 : 1; });
+  };
+  // Le moins de matchs possible, avec chaque sélection à 50 % ou plus
+  var autoCoupon = function (ms, target) {
+    var pool = [], conf = {};
+    ms.forEach(function (m) {
+      if (!m.e) return;
+      conf[m.id] = m.q;
+      candsOf(m).forEach(function (c) { if (c.p >= 0.4 && c.p <= 0.9) pool.push(c); });
+    });
+    var chosen = null;
+    for (var k = 2; k <= MAX_LEGS; k++) {
+      var legs = buildCoupon(pool, target, k, conf);
+      if (!legs) continue;
+      chosen = legs;
+      if (Math.min.apply(null, legs.map(function (c) { return c.p; })) >= 0.5) break;
+    }
+    return chosen;
+  };
+  var legOf = function (c) {
+    return { id: c.id, mid: c.mid, key: c.key, line: c.line, sel: c.sel, p: c.p, fair: c.fair, l: c.l, m: c.m, h: c.h, a: c.a, ko: c.ko, s: c.s };
+  };
+  // « À cote égale, moins de matchs = plus de chance » : chance d'un coupon de cote bookmaker B en k matchs
+  var sameOdds = function (book, current) {
+    var rows = '';
+    var ks = [2, 3, 5, 8, 10];
+    if (current > 1 && ks.indexOf(current) < 0) ks.push(current);
+    ks.sort(function (a, b) { return a - b; }).forEach(function (k) {
+      var p = 1 / (book * Math.pow(1 + MARGIN, k));
+      rows += '<li' + (k === current ? ' class="on"' : '') + '><span>' + fmt(T.tk_k, { k: k }) + '</span><i class="meter"><i class="' +
+        (p >= 0.5 ? 'hi' : p >= 0.3 ? 'mid' : '') + '" style="width: ' + (Math.min(p, 1) * 100).toFixed(1) + '%"></i></i><b>' + pctTxt(p) + '</b></li>';
+    });
+    return rows;
+  };
+
+  var TData = {
+    p: null,
+    get: function (src) {
+      if (!TData.p) {
+        TData.p = fetch(src, { credentials: 'same-origin' }).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        });
+        TData.p.catch(function () { TData.p = null; });
+      }
+      return TData.p;
+    }
+  };
+
+  // ---------- Onglet Paris : jour, niveau, boutons « + » ----------
+  var initBets = function (scope) {
+    var daysEl = scope.querySelector('#pdays');
+    if (!daysEl) return;
+    var pills = $$('.day', daysEl);
+    var secs = $$('.pday', scope);
+    var tiersEl = scope.querySelector('#ptiers');
+    var tierBtns = $$('button', tiersEl);
+    var today = dayKey(new Date());
+    var now = Date.now();
+    $$('.pick[data-ko], .dc-legs li[data-ko]', scope).forEach(function (el) {
+      if (new Date(el.dataset.ko).getTime() <= now) el.classList.add('started');
+    });
+    $$('button[data-add]', scope).forEach(function (b) {
+      try { b.dataset.id = JSON.parse(b.dataset.add).id; } catch (e) {}
+    });
+    pills.forEach(function (p) {
+      var d = p.dataset.day;
+      p.hidden = d < today;
+      p.querySelector('small').textContent = d === today ? T.today : cap(F.wd.format(fromKey(d)));
+    });
+    var keys = pills.filter(function (p) { return !p.hidden; }).map(function (p) { return p.dataset.day; });
+    if (!keys.length) keys = pills.slice(-1).map(function (p) { p.hidden = false; return p.dataset.day; });
+    var open = function (k) {
+      var sec = secs.filter(function (s) { return s.dataset.day === k; })[0];
+      return !!sec && $$('.pick, .dc-legs li', sec).some(function (el) { return !el.classList.contains('started'); });
+    };
+    var saved = session.get('pday');
+    var state = {
+      day: keys.indexOf(saved) >= 0 ? saved : (keys.filter(open)[0] || keys[0]),
+      tier: TIER_RANGE[session.get('ptier')] ? session.get('ptier') : 'safe'
+    };
+    var render = function () {
+      pills.forEach(function (p) {
+        var on = p.dataset.day === state.day;
+        p.classList.toggle('on', on);
+        p.setAttribute('aria-pressed', on);
+      });
+      secs.forEach(function (s) { s.classList.toggle('on', s.dataset.day === state.day); });
+      tierBtns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.tier === state.tier); });
+      $$('.plist', scope).forEach(function (l) { l.classList.toggle('on', l.dataset.tier === state.tier); });
+      session.set('pday', state.day);
+      session.set('ptier', state.tier);
+    };
+    daysEl.addEventListener('click', function (e) {
+      var p = e.target.closest('.day');
+      if (!p) return;
+      state.day = p.dataset.day;
+      render();
+    });
+    tiersEl.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-tier]');
+      if (!b) return;
+      state.tier = b.dataset.tier;
+      render();
+    });
+    render();
+    var on = pills.filter(function (p) { return p.classList.contains('on'); })[0];
+    if (on) daysEl.scrollLeft = Math.max(0, on.offsetLeft - 20);
+    markAdded(scope);
+    Coupon.on(function () { markAdded(scope); }, function () { return daysEl.isConnected; });
+  };
+
+  // ---------- Page d'un match : « Ajouter au ticket » à côté de « Compare ta cote » ----------
+  var initMatchAdd = function (scope) {
+    var btn = scope.querySelector('#cmp-add');
+    if (!btn) return;
+    var data = {};
+    try { data = JSON.parse(scope.querySelector('#cmp-data').textContent); } catch (e) { return; }
+    var select = scope.querySelector('#cmp-sel');
+    var sync = function () {
+      var id = select.value;
+      var it = data.items[id];
+      var parts = id.split('|');
+      var line = parts[1] === 'None' ? null : parseFloat(parts[1]);
+      var opt = select.options[select.selectedIndex];
+      var leg = { id: data.mid + '|' + parts[0] + '|' + (line == null ? '' : line) + '|' + parts[2], mid: data.mid, key: parts[0], line: line,
+        sel: parts[2], p: it.p, fair: it.fair, l: opt ? opt.textContent : '', m: opt && opt.parentNode.label || '', h: data.h, a: data.a,
+        ko: data.ko, s: data.s };
+      btn.dataset.add = JSON.stringify(leg);
+      btn.dataset.id = leg.id;
+      markAdded(scope);
+    };
+    btn.hidden = new Date(data.ko).getTime() <= Date.now();
+    select.addEventListener('change', sync);
+    sync();
+    Coupon.on(function () { markAdded(scope); }, function () { return btn.isConnected; });
+  };
+
+  // ---------- Onglet Ticket ----------
+  var initTicket = function (scope) {
+    var box = scope.querySelector('#tk');
+    if (!box) return;
+    var src = box.dataset.src;
+    var $ = function (s) { return box.querySelector(s); };
+    var modes = $$('#tk-modes button', box);
+    var panels = $$('.tk-panel', box);
+    var alive = function () { return box.isConnected; };
+    var mode = session.get('tkmode');
+    if (['mine', 'target', 'count'].indexOf(mode) < 0) mode = 'mine';
+    var showMode = function () {
+      modes.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.mode === mode); });
+      panels.forEach(function (p) { p.hidden = p.dataset.panel !== mode; });
+      session.set('tkmode', mode);
+      if (mode !== 'mine' && Acct.premium()) prepAuto();
+    };
+    $('#tk-modes').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-mode]');
+      if (!b) return;
+      mode = b.dataset.mode;
+      showMode();
+    });
+
+    // --- Jours proposés (à partir des matchs à venir) ---
+    var fillDays = function (sel, data) {
+      var today = dayKey(new Date());
+      var tom = dayKey(new Date(Date.now() + 864e5));
+      var days = [];
+      openMatches(data).forEach(function (m) { if (days.indexOf(m.d) < 0) days.push(m.d); });
+      days.sort();
+      var keep = sel.value;
+      sel.innerHTML = days.map(function (d) {
+        var lbl = d === today ? T.tk_today : d === tom ? T.tk_tomorrow : cap(F.long.format(fromKey(d)));
+        return '<option value="' + d + '">' + esc(lbl) + '</option>';
+      }).join('');
+      if (days.indexOf(keep) >= 0) sel.value = keep;
+      return days;
+    };
+    var withData = function (fn, out) {
+      if (out) out.innerHTML = '<p class="note">' + esc(T.tk_loading) + '</p>';
+      TData.get(src).then(function (d) { if (alive()) { if (out) out.innerHTML = ''; fn(d); } }, function () {
+        if (out && alive()) out.innerHTML = '<p class="empty">' + esc(T.tk_load_err) + '</p>';
+      });
+    };
+
+    // --- Mon coupon : liste ---
+    var legsEl = $('#tk-legs');
+    var emptyEl = $('#tk-empty');
+    var an = $('#tk-an');
+    var lockMore = $('#tk-lock-more');
+    var weakEl = $('#tk-weak');
+    var oddsIn = $('#tk-odds');
+    var verdict = $('#tk-verdict');
+    var weakId = null;
+    var legHtml = function (l, weak) {
+      var started = new Date(l.ko).getTime() <= Date.now();
+      return '<div class="tleg' + (weak ? ' weak' : '') + (started ? ' started' : '') + '">' +
+        '<span class="tl-txt"><b>' + esc(l.l) + '</b><small>' + esc(l.m) + '</small><span class="tl-match">' + esc(l.h + ' – ' + l.a) +
+        ' · ' + esc(whenTxt(l.ko)) + (started ? ' · ' + esc(T.tk_started_short) : '') + '</span></span>' +
+        '<span class="tl-p">' + pctTxt(l.p) + '</span>' +
+        '<button class="tl-x" type="button" data-remove="' + esc(l.id) + '" aria-label="' + esc(T.tk_remove + T.colon + l.l) + '" title="' +
+        esc(T.tk_remove) + '">' + IC_X + '</button></div>';
+    };
+    var renderVerdict = function (st) {
+      var raw = oddsIn.value.trim().replace(',', '.');
+      if (!raw) { verdict.hidden = true; return; }
+      var odds = parseFloat(raw);
+      var kind, msg;
+      if (!isFinite(odds) || odds <= 1 || !/^\d+(\.\d*)?$/.test(raw)) {
+        kind = 'warn';
+        msg = '<b>' + T.v_invalid + '</b>' + T.colon + T.v_invalid_txt;
+      } else {
+        var r = odds / st.fair;
+        kind = r >= 1.02 ? 'good' : r >= 0.98 ? 'fair' : 'bad';
+        msg = '<b>' + T['v_' + kind] + '</b>' + T.colon +
+          fmt(T['v_' + kind + '_txt'], { odds: oddsTxt(odds), fair: oddsTxt(st.fair), m: pctTxt(1 - r) }) + ' ' + T.v_note;
+      }
+      verdict.className = 'verdict ' + kind;
+      verdict.querySelector('.v-txt').innerHTML = msg;
+      verdict.hidden = false;
+    };
+    var renderWeak = function (legs, st) {
+      weakEl.hidden = legs.length < 2;
+      if (legs.length < 2) return;
+      var w = legs.reduce(function (a, b) { return b.p < a.p ? b : a; });
+      var drop = { p: st.p / w.p, book: st.book / (w.fair / (1 + MARGIN)) };
+      weakEl.querySelector('.wk-txt').innerHTML = esc(fmt(T.tk_weak, { l: w.l + ' (' + w.h + ' – ' + w.a + ')', p: pctTxt(w.p) })) + ' ' +
+        esc(fmt(T.tk_drop, { c: pctTxt(drop.p), o: oddsTxt(drop.book) }));
+      var swapEl = weakEl.querySelector('.wk-swap');
+      swapEl.hidden = true;
+      TData.get(src).then(function (data) {
+        if (!alive()) return;
+        var m = data.matches.filter(function (x) { return x.id === w.mid; })[0];
+        if (!m) return;
+        var alt = candsOf(m).filter(function (c) { return c.p > w.p + 0.05 && c.p <= 0.86 && c.fair >= 1.12; })
+          .sort(function (a, b) { return b.p - a.p; })[0];
+        if (!alt) return;
+        var np = st.p / w.p * alt.p;
+        var nb = st.book / w.fair * alt.fair;
+        swapEl.querySelector('span').textContent = fmt(T.tk_swap, { l: alt.l, p: pctTxt(alt.p), c: pctTxt(np), o: oddsTxt(nb) });
+        var b = swapEl.querySelector('button');
+        b.dataset.add = JSON.stringify(legOf(alt));
+        b.dataset.id = alt.id;
+        swapEl.hidden = false;
+      }, noop);
+    };
+    var renderMine = function () {
+      var legs = Coupon.get();
+      var st = Coupon.stats(legs);
+      var weak = legs.length >= 2 ? legs.reduce(function (a, b) { return b.p < a.p ? b : a; }).id : null;
+      legsEl.innerHTML = legs.map(function (l) { return legHtml(l, l.id === weak); }).join('');
+      emptyEl.hidden = !!legs.length;
+      $('#tk-clear').hidden = !legs.length;
+      $('#tk-share').hidden = !legs.length;
+      an.hidden = !legs.length;
+      if (!legs.length) return;
+      var over = !Acct.premium() && legs.length > FREE_LEGS;
+      an.classList.toggle('over', over);
+      lockMore.hidden = !over;
+      $('#tk-ring').innerHTML = ringHtml(st.p, 'big');
+      $('#tk-times').textContent = timesTxt(st.p);
+      $('#tk-count').textContent = legs.length === 1 ? T.tk_1 : fmt(T.tk_n, { n: legs.length });
+      $('#tk-fair').textContent = oddsTxt(st.fair);
+      $('#tk-book').textContent = '≈ ' + oddsTxt(st.book);
+      $('#tk-same').innerHTML = sameOdds(st.book, legs.length);
+      $('#tk-same-box').hidden = legs.length < 2;
+      renderVerdict(st);
+      if (weak !== weakId || !legs.length) weakId = weak;
+      renderWeak(legs, st);
+    };
+    legsEl.addEventListener('click', function (e) {
+      var x = e.target.closest('[data-remove]');
+      if (x) Coupon.remove(x.dataset.remove);
+    });
+    $('#tk-clear').addEventListener('click', function () { Coupon.set([]); toast(T.tk_cleared); });
+    oddsIn.addEventListener('input', function () { renderVerdict(Coupon.stats(Coupon.get())); });
+    $('#tk-share').addEventListener('click', function () {
+      var legs = Coupon.get();
+      if (!legs.length) return;
+      var st = Coupon.stats(legs);
+      var lines = [T.tk_share_head];
+      legs.forEach(function (l, i) { lines.push((i + 1) + '. ' + l.h + ' – ' + l.a + T.colon + l.l + ' (' + pctTxt(l.p) + ')'); });
+      lines.push(fmt(T.tk_share_chance, { p: pctTxt(st.p), f: oddsTxt(st.fair) }));
+      lines.push(location.origin + '/' + lang + '/');
+      var text = lines.join('\n');
+      if (navigator.share) navigator.share({ text: text }).catch(noop);
+      else win.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+    });
+
+    // --- Mon coupon : ajouter un pari depuis la liste des matchs ---
+    var picker = $('#tk-picker');
+    var daySel = $('#tk-day'), matchSel = $('#tk-match'), betSel = $('#tk-bet'), betInfo = $('#tk-bet-info');
+    var pdata = null, pcands = [];
+    var fillMatches = function () {
+      var ms = openMatches(pdata, daySel.value);
+      matchSel.innerHTML = ms.map(function (m) {
+        return '<option value="' + esc(m.id) + '">' + esc(F.time.format(new Date(m.k)) + ' · ' + m.h + ' – ' + m.a + ' (' + m.lg + ')' +
+          (m.q === 'low' ? ' · ' + T.tk_low : '')) + '</option>';
+      }).join('');
+      fillBets();
+    };
+    var fillBets = function () {
+      var m = pdata.matches.filter(function (x) { return x.id === matchSel.value; })[0];
+      pcands = m ? candsOf(m) : [];
+      var groups = [], html = '';
+      pcands.forEach(function (c, i) {
+        var g = groups.filter(function (x) { return x.t === c.m; })[0];
+        if (!g) { g = { t: c.m, o: [] }; groups.push(g); }
+        g.o.push('<option value="' + i + '">' + esc(c.l + (Acct.premium() ? ' — ' + pctTxt(c.p) : '')) + '</option>');
+      });
+      groups.forEach(function (g) { html += '<optgroup label="' + esc(g.t) + '">' + g.o.join('') + '</optgroup>'; });
+      betSel.innerHTML = html;
+      showBet();
+    };
+    var showBet = function () {
+      var c = pcands[+betSel.value];
+      betInfo.textContent = c && Acct.premium() ? fmt(T.chance, { p: pctTxt(c.p), fair: oddsTxt(c.fair) }) : '';
+    };
+    $('#tk-open').addEventListener('click', function () {
+      picker.hidden = !picker.hidden;
+      if (picker.hidden || pdata) return;
+      withData(function (d) {
+        pdata = d;
+        fillDays(daySel, d);
+        fillMatches();
+      });
+    });
+    daySel.addEventListener('change', fillMatches);
+    matchSel.addEventListener('change', fillBets);
+    betSel.addEventListener('change', showBet);
+    $('#tk-add').addEventListener('click', function () {
+      var c = pcands[+betSel.value];
+      if (c) Coupon.add(legOf(c));
+    });
+
+    // --- Cote cible et nombre de matchs (Premium) ---
+    var autoReady = false;
+    var couponCard = function (legs, out) {
+      if (!legs || !legs.length) { out.innerHTML = '<p class="empty">' + esc(T.tk_none) + '</p>'; return; }
+      var st = Coupon.stats(legs);
+      out.innerHTML = '<article class="dcoupon">' +
+        '<div class="dc-head"><span class="dc-target">≈ ' + oddsTxt(st.book) + '</span><span class="dc-meta">' +
+        esc((legs.length === 1 ? T.tk_1 : fmt(T.tk_n, { n: legs.length })) + ' · ' + fmt(T.tk_kc, { p: pctTxt(st.p) })) + '</span></div>' +
+        '<ol class="dc-legs">' + legs.map(function (c) {
+          return '<li><span class="dc-l"><b>' + esc(c.l) + '</b><small>' + esc(c.h + ' – ' + c.a + ' · ' + whenTxt(c.ko)) + '</small></span>' +
+            '<span class="dc-p">' + pctTxt(c.p) + '</span></li>';
+        }).join('') + '</ol>' +
+        '<div class="dc-foot"><span class="dc-odds"><small>' + esc(T.tk_book) + '</small><b>≈ ' + oddsTxt(st.book) + '</b><small>' +
+        esc(T.tk_fair + ' ' + oddsTxt(st.fair) + ' · ' + timesTxt(st.p)) + '</small></span>' +
+        '<button class="btn dc-load" type="button" data-legs="' + esc(JSON.stringify(legs.map(legOf))) + '">' + IC_PLUS + esc(T.tk_use) + '</button></div>' +
+        '<div class="same-box"><h3>' + esc(T.tk_same_title) + '</h3><p>' + esc(T.tk_same_text) + '</p><ul class="same">' +
+        sameOdds(st.book, legs.length) + '</ul></div></article>';
+    };
+    var prepAuto = function () {
+      if (autoReady) return;
+      autoReady = true;
+      withData(function (d) {
+        fillDays($('#tg-day'), d);
+        fillDays($('#ct-day'), d);
+      });
+    };
+    $('#tg-quick').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-odds]');
+      if (!b) return;
+      $('#tg-odds').value = b.dataset.odds;
+      $('#tg-go').click();
+    });
+    $('#tg-go').addEventListener('click', function () {
+      var out = $('#tg-out');
+      var target = parseFloat($('#tg-odds').value.trim().replace(',', '.'));
+      if (!isFinite(target) || target < 1.5 || target > 100) {
+        out.innerHTML = '<p class="empty">' + esc(T.tk_bad_target) + '</p>';
+        return;
+      }
+      withData(function (d) { couponCard(autoCoupon(openMatches(d, $('#tg-day').value), target), out); }, out);
+    });
+    var ctTier = 'safe';
+    $('#ct-tier').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-tier]');
+      if (!b) return;
+      ctTier = b.dataset.tier;
+      $$('button', $('#ct-tier')).forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+    });
+    $('#ct-go').addEventListener('click', function () {
+      var out = $('#ct-out');
+      var n = +$('#ct-n').value;
+      withData(function (d) {
+        var legs = tierPicks(openMatches(d, $('#ct-day').value), TIER_RANGE[ctTier], n);
+        couponCard(legs.length === n ? legs : null, out);
+      }, out);
+    });
+
+    showMode();
+    renderMine();
+    Coupon.on(function () { renderMine(); markAdded(box); }, alive);
+    Acct.on(function () { renderMine(); if (mode !== 'mine' && Acct.premium()) prepAuto(); }, alive);
+  };
+
   var init = function (scope) {
     initDates(scope);
     initImages(scope);
@@ -1035,6 +1634,10 @@
     initAccount(scope);
     initPremium(scope);
     initFree(scope);
+    initBets(scope);
+    initMatchAdd(scope);
+    initTicket(scope);
+    Coupon.badge();
   };
 
   // =====================================================================================================
