@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 120" width="380" height="120">
+  <title>Probalis</title>
+  <path d="M37.5 26 H59.5 A24 24 0 0 1 59.5 74 H37.5" fill="none" stroke="#E5E7EB" stroke-width="12" stroke-linecap="round"/>
+  <path d="M37.5 26 H59.5 A24 24 0 0 1 59.5 74 H37.5" fill="none" stroke="#22C55E" stroke-width="12" stroke-linecap="round" stroke-dasharray="83.6 200"/>
+  <rect x="30.5" y="20" width="14" height="80" rx="7" fill="#1F2937"/>
+  <text x="112" y="82" font-family="Inter, 'Segoe UI', Roboto, Arial, sans-serif" font-size="62" font-weight="700" letter-spacing="-1.5" fill="#1F2937">Proba<tspan fill="#16A34A">lis</tspan></text>
+</svg>

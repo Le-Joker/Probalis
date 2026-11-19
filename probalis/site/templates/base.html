@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{% block title %}Probalis · {{ t.tagline }}{% endblock %}</title>
+<meta name="description" content="{% block description %}{{ t.tagline }}{% endblock %}">
+<meta name="theme-color" content="#F3F5F8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#071426" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/probalis-icone.svg" type="image/svg+xml">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+<link rel="alternate" hreflang="{{ other_lang }}" href="/{{ other_lang }}/{{ path }}">
+<link rel="preconnect" href="https://r2.thesportsdb.com" crossorigin>
+<link rel="preload" href="/assets/fonts/jakarta-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/sora-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/style.css?v={{ version }}">
+{# Avant l'affichage : thème, compte (Premium = pas de pub), connexion lente #}
+<script>(function(d){d.classList.add('js');try{var th=localStorage.getItem('theme');if(th)d.dataset.theme=th;localStorage.setItem('lang','{{ lang }}');var a=JSON.parse(localStorage.getItem('pb-acct')||'null');if(a&&a.user){d.classList.add('signed');if(a.profile&&a.profile.premium_until&&new Date(a.profile.premium_until)>new Date())d.classList.add('premium')}}catch(e){}var c=navigator.connection;if(c&&(c.saveData||/2g/.test(c.effectiveType||'')))d.classList.add('lite')})(document.documentElement)</script>
+</head>
+<body class="page-{{ page }}">
+<div class="app">
+{% block header %}
+<header class="top">
+  <a class="brand" href="{{ root }}index.html" aria-label="Probalis">{{ logo_mark(36) }}<span class="wordmark" aria-hidden="true">Proba<span>lis</span></span></a>
+  <div class="actions">
+    <a class="round lang" href="/{{ other_lang }}/{{ path }}" hreflang="{{ other_lang }}" data-lang="{{ other_lang }}" aria-label="{{ t.lang_version }}" title="{{ t.lang_version }}">{{ other_lang|upper }}</a>
+    <button class="round theme" type="button" aria-label="{{ t.theme }}" title="{{ t.theme }}">{{ icon('moon') }}{{ icon('sun') }}</button>
+  </div>
+</header>
+{% endblock %}
+<main id="main" tabindex="-1">
+{% block content %}{% endblock %}
+</main>
+<footer class="foot">
+  <p>{{ t.responsible }}</p>
+  <p class="foot-links"><a href="{{ root }}premium.html">{{ t.premium }}</a> · <a href="{{ root }}jeu-responsable.html">{{ t.legal_responsible }}</a> · <a href="{{ root }}conditions.html">{{ t.legal_terms }}</a> · <a href="{{ root }}confidentialite.html">{{ t.legal_privacy }}</a></p>
+  <p>{{ t.data_credit }} {{ t.updated }} <time data-dt="{{ generated_iso }}">{{ generated.strftime('%d/%m/%Y %H:%M') }} UTC</time> · <a href="/{{ other_lang }}/{{ path }}" hreflang="{{ other_lang }}" data-lang="{{ other_lang }}">{{ t.lang_version }}</a></p>
+</footer>
+</div>
+<nav class="tabbar" aria-label="{{ t.nav_label }}">
+{% for key, href, ic, label in [('matches', 'index.html', 'ball', t.tab_matches), ('bets', 'paris.html', 'trend', t.tab_bets), ('ticket', 'ticket.html', 'ticket', t.tab_ticket), ('historique', 'historique.html', 'history', t.tab_history), ('compte', 'compte.html', 'user', t.tab_account)] %}
+  <a href="{{ root }}{{ href }}" data-tab="{{ key }}" title="{{ label }}"{% if page == key %} aria-current="page"{% endif %}>{{ icon(ic, 24) }}<span class="tl">{{ label }}</span></a>
+{% endfor %}
+</nav>
+<script id="pb-i18n" type="application/json">{{ js|tojson }}</script>
+<script id="pb-config" type="application/json">{{ cfg|tojson }}</script>
+<script src="/assets/app.js?v={{ version }}"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+# Probalis : recalcule toutes les analyses et remet le site en ligne toutes les 2 heures pendant la journée.
+# Chaque lancement analyse les matchs d'aujourd'hui jusqu'à J+8 (fenêtre glissante) et tient compte
+# des résultats déjà connus, y compris ceux des matchs joués plus tôt dans la journée.
+name: Analyses et site
+
+on:
+  schedule:
+    # Toutes les 2 heures pendant la journée de foot (heure UTC) : 8 h 17, 10 h 17… 22 h 17, plus 0 h 17 pour
+    # les résultats des matchs du soir. Aucun match de nos compétitions entre 1 h et 8 h UTC : ces relances
+    # ne serviraient à rien et feraient dépasser les 2 000 minutes gratuites par mois d'un dépôt privé.
+    # Pour relancer aussi la nuit : "17 */2 * * *". La 17e minute évite l'heure pile, très chargée chez GitHub.
+    - cron: "17 0,8-22/2 * * *"
+  workflow_dispatch:        # bouton « Run workflow » pour relancer à la main
+
+concurrency:
+  group: analyses
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75     # le tout premier lancement (cache vide) dure environ 30 minutes
+    env:
+      PYTHONIOENCODING: utf-8
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Installer Probalis
+        run: pip install -e .
+
+      - name: Reprendre les données déjà téléchargées
+        uses: actions/cache/restore@v4
+        with:
+          path: data/cache
+          key: donnees-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: donnees-
+
+      - name: Calculer les analyses et générer le site
+        run: python -m probalis build
+
+      - name: Garder les données pour le prochain lancement
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/cache
+          key: donnees-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # Seulement si les secrets Cloudflare sont enregistrés (voir docs/03-sources-gratuites.md, partie 4).
+      # Si le calcul a échoué, ces étapes ne s'exécutent pas : l'ancien site reste en ligne.
+      - name: Créer le projet Cloudflare Pages (lancement à la main ; sans effet s'il existe déjà)
+        if: github.event_name == 'workflow_dispatch' && env.CLOUDFLARE_API_TOKEN != ''
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create ${{ vars.CLOUDFLARE_PROJECT || 'probalis' }} --production-branch=main
+
+      - name: Mettre le site en ligne (Cloudflare Pages)
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy public --project-name=${{ vars.CLOUDFLARE_PROJECT || 'probalis' }} --branch=main

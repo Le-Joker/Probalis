@@ -1,0 +1,39 @@
+{% macro crest(c, size='', big=false, eager=false) %}<span class="crest{% if size %} {{ size }}{% endif %}{% if not c.img %} noimg{% endif %}" style="--crest: {{ c.color }}" data-initials="{{ c.initials }}">{% if c.img %}<img src="{{ c.img_lg if big else c.img }}" alt=""{% if not eager %} loading="lazy"{% endif %} decoding="async" referrerpolicy="no-referrer">{% endif %}</span>{% endmacro %}
+
+{% macro league_logo(lg, size='') %}<span class="lgl{% if size %} {{ size }}{% endif %}{% if not lg.logo %} noimg{% endif %}{% if lg.on_dark %} ondark{% endif %}" data-initials="{{ lg.initials }}">{% if lg.logo %}<img src="{{ lg.logo }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">{% endif %}</span>{% endmacro %}
+
+{% macro bar3(m, big=false) %}<div class="bar3{% if big %} big{% endif %}" role="img" aria-label="1 {{ m.p1_txt }}, X {{ m.px_txt }}, 2 {{ m.p2_txt }}">{% for p in (m.p1, m.px, m.p2) %}<i{% if loop.index0 == m.best %} class="fav"{% endif %} style="width: {{ (p * 100)|round(1) }}%"></i>{% endfor %}</div>{% endmacro %}
+
+{% macro pcts(m, labels, big=false) %}<div class="pcts{% if big %} big{% endif %}">{% for p, l in [(m.p1_txt, labels[0]), (m.px_txt, labels[1]), (m.p2_txt, labels[2])] %}<span{% if loop.index0 == m.best %} class="fav"{% endif %}><b>{{ p }}</b>{{ l }}</span>{% endfor %}</div>{% endmacro %}
+
+{% macro match_card(m, t, root) %}
+<a class="mcard" href="{{ root }}match/{{ m.slug }}.html" data-ko="{{ m.kickoff }}" data-league="{{ m.league }}">
+  <div class="mc-top">
+    <span class="time"><span class="dd" data-dshort="{{ m.kickoff }}">{{ m.day_short }}</span><time data-ko="{{ m.kickoff }}">{{ m.kickoff[11:16] }}</time></span>
+    <span class="mc-stats">{{ t.over25_short }} {{ m.over25 }} · {{ t.btts_short }} {{ m.btts_yes }}</span>
+  </div>
+  <div class="mc-body">
+    <div class="mc-teams">
+      <span class="team">{{ crest(m.home_crest) }}<span class="nm">{{ m.home.name }}</span></span>
+      <span class="team">{{ crest(m.away_crest) }}<span class="nm">{{ m.away.name }}</span></span>
+    </div>
+    <div class="boxes">
+    {% for k, p in [('1', m.p1_txt), ('X', m.px_txt), ('2', m.p2_txt)] %}
+      <span class="box{% if loop.index0 == m.best %} on{% endif %}"><small>{{ k }}</small><b>{{ p }}</b></span>
+    {% endfor %}
+    </div>
+  </div>
+</a>
+{% endmacro %}
+
+{# Emplacement de publicité discret (pub maison pour l'instant), masqué pour les membres Premium #}
+{% macro ad(t, root, slot) %}<aside class="ad" data-ad="{{ slot }}" aria-label="{{ t.ad_label }}">
+  <span class="ad-tag">{{ t.ad_label }}</span>
+  <a class="ad-body" href="{{ root }}premium.html">
+    <span class="ad-ic">{{ icon('crown', 20, 2.2) }}</span>
+    <span class="ad-txt"><b>{{ t.ad_title }}</b><small>{{ t.ad_text }} <span data-from-price></span></small></span>
+    <span class="ad-cta">{{ t.ad_cta }}</span>
+  </a>
+</aside>{% endmacro %}
+
+{% macro lock_pill(t, root) %}<a class="lock-pill" href="{{ root }}premium.html">{{ icon('lock', 13, 2.4) }}{{ t.lock_pill }}</a>{% endmacro %}

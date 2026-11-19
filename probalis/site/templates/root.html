@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Probalis · La science du pari</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/probalis-icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+<meta name="theme-color" content="#FFFFFF">
+<script>
+(function () {
+  var lang = null;
+  try { lang = localStorage.getItem('lang'); } catch (e) {}
+  if (lang !== 'fr' && lang !== 'en') {
+    lang = (navigator.language || 'fr').toLowerCase().indexOf('fr') === 0 ? 'fr' : 'en';
+  }
+  location.replace('/' + lang + '/');
+})();
+</script>
+</head>
+<body style="font-family: system-ui, sans-serif; text-align: center; padding: 3rem 1rem;">
+<p><a href="/fr/">Français</a> · <a href="/en/">English</a></p>
+</body>
+</html>

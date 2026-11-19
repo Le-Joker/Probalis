@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "_card.html" import league_logo %}
+{% block title %}{{ t.account_title }} · Probalis{% endblock %}
+{% block content %}
+<div class="intro">
+  <div class="kicker">Probalis</div>
+  <h1 class="h1">{{ t.account_title }}</h1>
+</div>
+{% if cfg.demo %}<p class="demo-note">{{ icon('info', 16, 2.2) }}<span>{{ t.demo_banner }}</span></p>{% endif %}
+<p class="flash" id="flash" role="status" hidden></p>
+
+<div class="acct" id="acct" data-state="" aria-live="polite">
+  <div class="acct-loading" aria-hidden="true">
+    <div class="sk sk-block" style="height: 92px"></div>
+    <div class="sk sk-block" style="height: 150px"></div>
+    <div class="sk sk-block" style="height: 190px"></div>
+  </div>
+
+  {# --- Pas connecté --- #}
+  <section class="signin" data-when="out" aria-labelledby="signin-title">
+    <span class="f-ring" aria-hidden="true"></span>
+    <span class="soon-ic">{{ icon('user', 28, 2) }}</span>
+    <h2 id="signin-title">{{ t.signin_title }}</h2>
+    <p>{{ t.signin_text }}</p>
+    <ul>
+    {% for f in t.signin_perks %}
+      <li>{{ icon('check', 16, 2.6) }}{{ f }}</li>
+    {% endfor %}
+    </ul>
+    <label class="adult"><input type="checkbox" id="adult"><span>{{ t.adult_confirm }}</span></label>
+    <button class="gbtn" id="google" type="button">{{ google_g }}<span>{{ t.google_btn }}</span></button>
+    <p class="legal-mini">{{ t.signin_legal_a }} <a href="{{ root }}conditions.html">{{ t.terms_link }}</a> {{ t.signin_legal_b }} <a href="{{ root }}confidentialite.html">{{ t.privacy_link }}</a>.</p>
+  </section>
+
+  {# --- Connecté --- #}
+  <div class="acct-in" data-when="in">
+    <section class="card profile">
+      <span class="avatar" id="acct-avatar" aria-hidden="true"></span>
+      <div class="p-txt"><b id="acct-name"></b><small id="acct-email"></small></div>
+    </section>
+
+    <section class="card plan" aria-labelledby="plan-title">
+      <div class="card-head"><h2 id="plan-title">{{ t.plan_title }}</h2><span class="plan-badge" id="plan-badge"></span></div>
+      <p class="note" id="plan-text" data-free="{{ t.free_plan_text }}">{{ t.free_plan_text }}</p>
+      <a class="btn" id="plan-cta" href="{{ root }}premium.html" data-go="{{ t.go_premium }}" data-extend="{{ t.extend }}">{{ icon('crown', 18, 2.2) }}<span>{{ t.go_premium }}</span></a>
+      {% if cfg.demo %}
+      <label class="switch-row demo"><span><b>{{ t.demo_premium }}</b></span><input type="checkbox" class="switch" id="demo-premium"></label>
+      {% endif %}
+    </section>
+
+    <section class="card" aria-labelledby="mail-title">
+      <h2 id="mail-title">{{ t.emails_title }}</h2>
+      <label class="switch-row"><span><b>{{ t.email_news }}</b><small>{{ t.email_news_help }}</small></span><input type="checkbox" class="switch" data-pref="email_news"></label>
+      <label class="switch-row"><span><b>{{ t.email_reminders }}</b><small>{{ t.email_reminders_help }}</small></span><input type="checkbox" class="switch" data-pref="email_reminders"></label>
+      <p class="note">{{ t.email_note }}</p>
+    </section>
+
+    <section class="card" aria-labelledby="pref-title">
+      <h2 id="pref-title">{{ t.prefs_title }}</h2>
+      <label class="field-row"><span>{{ icon('globe', 18, 2.2) }}{{ t.language }}</span>
+        <select data-pref="lang"><option value="fr"{% if lang == 'fr' %} selected{% endif %}>Français</option><option value="en"{% if lang == 'en' %} selected{% endif %}>English</option></select>
+      </label>
+      <h3 class="sub">{{ icon('heart', 16, 2.2) }}{{ t.fav_title }}</h3>
+      <p class="note">{{ t.fav_help }}</p>
+      <div class="favs" id="favs">
+      {% for sec in sheet %}{% for lg in sec.leagues %}
+        <button class="fav-chip" type="button" data-league="{{ lg.code }}" aria-pressed="false">{{ league_logo(lg) }}<span>{{ lg.name }}</span></button>
+      {% endfor %}{% endfor %}
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="resp-title">
+      <h2 id="resp-title">{{ t.responsible_title }}</h2>
+      <p class="note">{{ t.responsible_text }}</p>
+      <a class="more" href="{{ root }}jeu-responsable.html">{{ t.responsible_link }}{{ icon('chev-right', 16, 2.4) }}</a>
+    </section>
+
+    <div class="acct-actions">
+      <button class="btn ghost" id="signout" type="button">{{ icon('logout', 18, 2.2) }}{{ t.signout }}</button>
+      <button class="link danger" id="delete" type="button">{{ icon('trash', 16, 2.2) }}{{ t.delete_account }}</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

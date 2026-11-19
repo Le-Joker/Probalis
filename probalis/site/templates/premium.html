@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Probalis Premium · {{ t.premium_kicker }}{% endblock %}
+{% block description %}{{ t.premium_lead }}{% endblock %}
+{% block content %}
+<section class="prem-hero" aria-labelledby="prem-title">
+  <span class="f-ring" aria-hidden="true"></span>
+  <span class="soon-ic">{{ icon('crown', 28, 2) }}</span>
+  <div class="kicker">{{ t.premium_kicker }}</div>
+  <h1 class="h1" id="prem-title">Probalis Premium</h1>
+  <p>{{ t.premium_lead }}</p>
+  <span class="hchip">{{ icon('shield', 14, 2.2) }}{{ t.adult_only }}</span>
+</section>
+{% if cfg.demo %}<p class="demo-note">{{ icon('info', 16, 2.2) }}<span>{{ t.demo_banner }}</span></p>{% endif %}
+<p class="flash" id="flash" role="status" hidden></p>
+
+<section class="card cmp-table" aria-label="{{ t.cmp_free }} / {{ t.cmp_premium }}">
+  <div class="ct-row head"><span></span><span>{{ t.cmp_free }}</span><span class="pr">{{ t.cmp_premium }}</span></div>
+  {% for label, free, prem in t.cmp_rows %}
+  <div class="ct-row"><span>{{ label }}</span>
+    <span class="{{ 'y' if free else 'n' }}">{{ icon('check' if free else 'x', 16, 2.6) }}<span class="sr-only">{{ t.cmp_free }}</span></span>
+    <span class="{{ 'y' if prem else 'n' }} pr">{{ icon('check' if prem else 'x', 16, 2.6) }}<span class="sr-only">{{ t.cmp_premium }}</span></span>
+  </div>
+  {% endfor %}
+</section>
+
+<div class="panel-head plans-head"><h2>{{ t.plans_title }}</h2></div>
+<label class="field country">{{ t.country }}
+  <select id="pay-country"><option value="">{{ t.other_country }}</option></select>
+</label>
+<div class="plans" id="plans" role="radiogroup" aria-label="{{ t.plans_title }}">
+  <button class="plan" type="button" role="radio" data-plan="week" aria-checked="false">
+    <b>{{ t.plan_week }}</b><span class="price num" data-price="week">{{ price_week }}</span><small data-perday="week"></small>
+  </button>
+  <button class="plan on" type="button" role="radio" data-plan="month" aria-checked="true">
+    <span class="best">{{ t.best_value }}</span>
+    <b>{{ t.plan_month }}</b><span class="price num" data-price="month">{{ price_month }}</span><small data-perday="month"></small>
+  </button>
+</div>
+<p class="methods"><span class="m-ic">{{ icon('card', 18, 2.2) }}{{ icon('phone', 18, 2.2) }}</span><span id="pay-methods" data-stripe="{{ t.methods_stripe }}" data-flutterwave="{{ t.methods_flutterwave }}">{{ t.methods_stripe }}</span></p>
+<button class="btn pay js-only" id="pay-btn" type="button">{{ icon('lock', 18, 2.4) }}<span>{{ t.go_premium }}</span></button>
+<p class="note center" id="pay-secure" data-stripe="{{ t.secure_stripe }}" data-flutterwave="{{ t.secure_flutterwave }}">{{ t.secure_stripe }}</p>
+<p class="note center">{{ t.no_renewal }}</p>
+
+<section class="card faq" aria-labelledby="faq-title">
+  <h2 id="faq-title">{{ t.faq_title }}</h2>
+  {% for q, a in t.faq %}
+  <details><summary>{{ q }}{{ icon('chev-down', 16, 2.4) }}</summary><p>{{ a }}</p></details>
+  {% endfor %}
+</section>
+<p class="note center">{{ t.responsible }} <a href="{{ root }}jeu-responsable.html">{{ t.responsible_link }}</a></p>
+{% endblock %}

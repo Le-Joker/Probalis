@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Probalis{% endblock %}
+{% block content %}
+{% set owner = site.owner_name or ('[' ~ t.to_complete ~ ']') %}
+{% set contact = site.contact_email or ('[' ~ t.to_complete ~ ']') %}
+<div class="intro">
+  <div class="kicker">Probalis</div>
+  <h1 class="h1">{{ title }}</h1>
+  <p class="lead">{{ t.legal_updated }}</p>
+</div>
+<article class="card legal">
+{% include "legal/" ~ doc ~ "_" ~ lang ~ ".html" %}
+</article>
+{% endblock %}

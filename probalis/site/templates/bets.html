@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_card.html" import crest, ad %}
+{% block content %}
+<div class="intro">
+  <div class="kicker">{{ t.this_week }}</div>
+  <h1 class="h1">{{ t.bets_title }}</h1>
+  <p class="lead">{{ t.likely_help }}</p>
+</div>
+
+{% if likely %}
+<h2 class="sr-only">{{ t.likely }}</h2>
+<div class="picks">
+{% for e in likely %}
+  <a class="pick" href="{{ root }}match/{{ e.match.slug }}.html" data-expire="{{ e.match.kickoff }}">
+    <span class="ring">
+      <svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true"><circle class="trk" cx="27" cy="27" r="23" fill="none" stroke-width="6"/><circle class="val" cx="27" cy="27" r="23" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ e.dash }}" transform="rotate(-90 27 27)"/></svg>
+      <b>{{ e.pct }}</b>
+    </span>
+    <span class="pk-txt">
+      <b>{{ e.label }}</b>
+      <small>{{ e.market }}</small>
+      <span class="pk-match">{{ crest(e.match.home_crest, 's16') }}{{ crest(e.match.away_crest, 's16') }}<span>{{ e.match.home.name }} – {{ e.match.away.name }} · <span data-dshort="{{ e.match.kickoff }}">{{ e.match.day_short }}</span> <time data-ko="{{ e.match.kickoff }}">{{ e.match.kickoff[11:16] }}</time></span></span>
+    </span>
+    <span class="pk-fair"><small>{{ t.fair_odds }}</small><span class="pill">{{ e.fair }}</span></span>
+  </a>
+  {% if loop.index == 4 and not loop.last %}{{ ad(t, root, 'bets') }}{% endif %}
+{% endfor %}
+</div>
+{% else %}
+<p class="empty">{{ t.no_likely }}</p>
+{% endif %}
+
+<section class="rel" aria-labelledby="rel-title">
+  <div class="rel-head"><span class="badge">{{ icon('shield', 18, 2.2) }}</span><h2 id="rel-title">{{ t.reliability }}</h2></div>
+  <div class="stats">
+    <div><b>{% if lang == 'fr' %}3 276{% else %}3,276{% endif %}</b><small>{{ t.rel_matches }}</small></div>
+    <div><b class="neg">{% if lang == 'fr' %}−12 %{% else %}−12%{% endif %}</b><small>{{ t.rel_gold }}</small></div>
+  </div>
+  <p>{{ t.rel_short }}</p>
+</section>
+{% endblock %}
