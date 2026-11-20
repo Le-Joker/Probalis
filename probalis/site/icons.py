@@ -55,6 +55,10 @@ PATHS = {
     "target": '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
     "hash": '<path d="M9.5 4 7.5 20M16.5 4l-2 16M4.5 9h15.5M4 15h15.5"/>',
     "pen": '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/>',
+    "arrow": '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    "download": '<path d="M12 4v11M7 10.5l5 5 5-5"/><path d="M5 20h14"/>',
+    "copy": '<rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5v-3a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>',
+    "laptop": '<rect x="4.5" y="5" width="15" height="10.5" rx="1.5"/><path d="M2.5 19h19"/>',
 }
 
 # Logo Google officiel (quatre couleurs), pour le bouton « Continuer avec Google »

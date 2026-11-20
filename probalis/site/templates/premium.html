@@ -30,14 +30,16 @@
   <select id="pay-country"><option value="">{{ t.other_country }}</option></select>
 </label>
 <div class="plans" id="plans" role="radiogroup" aria-label="{{ t.plans_title }}">
-  <button class="plan" type="button" role="radio" data-plan="week" aria-checked="false">
-    <b>{{ t.plan_week }}</b><span class="price num" data-price="week">{{ price_week }}</span><small data-perday="week"></small>
+{% for p in plans %}
+  <button class="plan{% if p.key == 'month' %} on{% endif %}" type="button" role="radio" data-plan="{{ p.key }}" aria-checked="{{ 'true' if p.key == 'month' else 'false' }}">
+    <span class="rd" aria-hidden="true"></span>
+    <b>{{ t['plan_' ~ p.key] }}</b><span class="price num" data-price="{{ p.key }}">{{ p.price }}</span>
+    <small data-perday="{{ p.key }}"></small><span class="save num" data-save="{{ p.key }}"{% if not p.save %} hidden{% endif %}>{{ p.save }}</span>
+    {% if loop.last %}<span class="best">{{ t.best_value }}</span>{% endif %}
   </button>
-  <button class="plan on" type="button" role="radio" data-plan="month" aria-checked="true">
-    <span class="best">{{ t.best_value }}</span>
-    <b>{{ t.plan_month }}</b><span class="price num" data-price="month">{{ price_month }}</span><small data-perday="month"></small>
-  </button>
+{% endfor %}
 </div>
+<p class="note save-note">{{ t.save_note }}</p>
 <p class="methods"><span class="m-ic">{{ icon('card', 18, 2.2) }}{{ icon('phone', 18, 2.2) }}</span><span id="pay-methods" data-stripe="{{ t.methods_stripe }}" data-flutterwave="{{ t.methods_flutterwave }}">{{ t.methods_stripe }}</span></p>
 <button class="btn pay js-only" id="pay-btn" type="button">{{ icon('lock', 18, 2.4) }}<span>{{ t.go_premium }}</span></button>
 <p class="note center" id="pay-secure" data-stripe="{{ t.secure_stripe }}" data-flutterwave="{{ t.secure_flutterwave }}">{{ t.secure_stripe }}</p>

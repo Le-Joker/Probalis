@@ -1,24 +1,27 @@
 {
-  "_note": "Prix des pass Premium, en unités normales (2.99 = 2,99 €). Le site et la fonction de paiement lisent ce même fichier : change un prix ici, reconstruis le site et redéploie les fonctions.",
+  "_note": "Prix des pass Premium, en unités normales (2.99 = 2,99 €). Le site et la fonction de paiement lisent ce même fichier : change un prix ici, reconstruis le site et redéploie les fonctions. L'ordre des formules ici est l'ordre d'affichage.",
   "plans": {
     "week": {"days": 7},
-    "month": {"days": 30}
+    "month": {"days": 30},
+    "quarter": {"days": 90},
+    "half": {"days": 180},
+    "year": {"days": 365}
   },
   "currencies": {
-    "EUR": {"provider": "stripe", "decimals": 2, "week": 2.99, "month": 7.99},
-    "USD": {"provider": "stripe", "decimals": 2, "week": 2.99, "month": 7.99},
-    "GBP": {"provider": "stripe", "decimals": 2, "week": 2.49, "month": 6.99},
-    "CAD": {"provider": "stripe", "decimals": 2, "week": 3.99, "month": 10.99},
-    "XOF": {"provider": "flutterwave", "decimals": 0, "week": 1000, "month": 3000, "options": "mobilemoneyfranco, card"},
-    "XAF": {"provider": "flutterwave", "decimals": 0, "week": 1000, "month": 3000, "options": "mobilemoneyfranco, card"},
-    "NGN": {"provider": "flutterwave", "decimals": 0, "week": 1500, "month": 4500, "options": "card, banktransfer, ussd"},
-    "GHS": {"provider": "flutterwave", "decimals": 0, "week": 20, "month": 60, "options": "mobilemoneyghana, card"},
-    "KES": {"provider": "flutterwave", "decimals": 0, "week": 200, "month": 600, "options": "mpesa, card"},
-    "UGX": {"provider": "flutterwave", "decimals": 0, "week": 5000, "month": 15000, "options": "mobilemoneyuganda, card"},
-    "TZS": {"provider": "flutterwave", "decimals": 0, "week": 5000, "month": 15000, "options": "mobilemoneytanzania, card"},
-    "RWF": {"provider": "flutterwave", "decimals": 0, "week": 2000, "month": 6000, "options": "mobilemoneyrwanda, card"},
-    "ZMW": {"provider": "flutterwave", "decimals": 0, "week": 40, "month": 120, "options": "mobilemoneyzambia, card"},
-    "ZAR": {"provider": "flutterwave", "decimals": 0, "week": 49, "month": 139, "options": "card"}
+    "EUR": {"provider": "stripe", "decimals": 2, "week": 2.99, "month": 7.99, "quarter": 19.99, "half": 34.99, "year": 59.99},
+    "USD": {"provider": "stripe", "decimals": 2, "week": 2.99, "month": 7.99, "quarter": 19.99, "half": 34.99, "year": 59.99},
+    "GBP": {"provider": "stripe", "decimals": 2, "week": 2.49, "month": 6.99, "quarter": 16.99, "half": 29.99, "year": 49.99},
+    "CAD": {"provider": "stripe", "decimals": 2, "week": 3.99, "month": 10.99, "quarter": 26.99, "half": 47.99, "year": 79.99},
+    "XOF": {"provider": "flutterwave", "decimals": 0, "week": 1000, "month": 3000, "quarter": 7500, "half": 13500, "year": 24000, "options": "mobilemoneyfranco, card"},
+    "XAF": {"provider": "flutterwave", "decimals": 0, "week": 1000, "month": 3000, "quarter": 7500, "half": 13500, "year": 24000, "options": "mobilemoneyfranco, card"},
+    "NGN": {"provider": "flutterwave", "decimals": 0, "week": 1500, "month": 4500, "quarter": 11000, "half": 20000, "year": 36000, "options": "card, banktransfer, ussd"},
+    "GHS": {"provider": "flutterwave", "decimals": 0, "week": 20, "month": 60, "quarter": 150, "half": 270, "year": 480, "options": "mobilemoneyghana, card"},
+    "KES": {"provider": "flutterwave", "decimals": 0, "week": 200, "month": 600, "quarter": 1500, "half": 2700, "year": 4800, "options": "mpesa, card"},
+    "UGX": {"provider": "flutterwave", "decimals": 0, "week": 5000, "month": 15000, "quarter": 37500, "half": 67500, "year": 120000, "options": "mobilemoneyuganda, card"},
+    "TZS": {"provider": "flutterwave", "decimals": 0, "week": 5000, "month": 15000, "quarter": 37500, "half": 67500, "year": 120000, "options": "mobilemoneytanzania, card"},
+    "RWF": {"provider": "flutterwave", "decimals": 0, "week": 2000, "month": 6000, "quarter": 15000, "half": 27000, "year": 48000, "options": "mobilemoneyrwanda, card"},
+    "ZMW": {"provider": "flutterwave", "decimals": 0, "week": 40, "month": 120, "quarter": 300, "half": 540, "year": 960, "options": "mobilemoneyzambia, card"},
+    "ZAR": {"provider": "flutterwave", "decimals": 0, "week": 49, "month": 139, "quarter": 349, "half": 629, "year": 1099, "options": "card"}
   },
   "countries": {
     "SN": "XOF", "CI": "XOF", "BJ": "XOF", "BF": "XOF", "ML": "XOF", "NE": "XOF", "TG": "XOF", "GW": "XOF",

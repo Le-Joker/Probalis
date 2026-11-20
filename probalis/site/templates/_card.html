@@ -2,26 +2,27 @@
 
 {% macro league_logo(lg, size='') %}<span class="lgl{% if size %} {{ size }}{% endif %}{% if not lg.logo %} noimg{% endif %}{% if lg.on_dark %} ondark{% endif %}" data-initials="{{ lg.initials }}">{% if lg.logo %}<img src="{{ lg.logo }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">{% endif %}</span>{% endmacro %}
 
-{% macro bar3(m, big=false) %}<div class="bar3{% if big %} big{% endif %}" role="img" aria-label="1 {{ m.p1_txt }}, X {{ m.px_txt }}, 2 {{ m.p2_txt }}">{% for p in (m.p1, m.px, m.p2) %}<i{% if loop.index0 == m.best %} class="fav"{% endif %} style="width: {{ (p * 100)|round(1) }}%"></i>{% endfor %}</div>{% endmacro %}
+{# Chiffres protégés (lk) : la page publique n'a qu'une forme vide sous cadenas, voir lock.py #}
+{% macro bar3(m, big=false) %}{% call lk(m=m.slug) %}<div class="bar3{% if big %} big{% endif %}" role="img" aria-label="1 {{ m.p1_txt }}, X {{ m.px_txt }}, 2 {{ m.p2_txt }}">{% for p in (m.p1, m.px, m.p2) %}<i{% if loop.index0 == m.best %} class="fav"{% endif %} style="width: {{ (p * 100)|round(1) }}%"></i>{% endfor %}</div>{% endcall %}{% endmacro %}
 
-{% macro pcts(m, labels, big=false) %}<div class="pcts{% if big %} big{% endif %}">{% for p, l in [(m.p1_txt, labels[0]), (m.px_txt, labels[1]), (m.p2_txt, labels[2])] %}<span{% if loop.index0 == m.best %} class="fav"{% endif %}><b>{{ p }}</b>{{ l }}</span>{% endfor %}</div>{% endmacro %}
+{% macro pcts(m, labels, big=false) %}<div class="pcts{% if big %} big{% endif %}">{% call lk(m=m.slug, own=true) %}{% for p, l in [(m.p1_txt, labels[0]), (m.px_txt, labels[1]), (m.p2_txt, labels[2])] %}{% if lk.pub %}<span><b class="lkd" aria-hidden="true">00 %</b>{{ l }}</span>{% else %}<span{% if loop.index0 == m.best %} class="fav"{% endif %}><b>{{ p }}</b>{{ l }}</span>{% endif %}{% endfor %}{% endcall %}</div>{% endmacro %}
 
 {% macro match_card(m, t, root) %}
 <a class="mcard" href="{{ root }}match/{{ m.slug }}.html" data-ko="{{ m.kickoff }}" data-league="{{ m.league }}">
   <div class="mc-top">
     <span class="time"><span class="dd" data-dshort="{{ m.kickoff }}">{{ m.day_short }}</span><time data-ko="{{ m.kickoff }}">{{ m.kickoff[11:16] }}</time></span>
-    <span class="mc-stats">{{ t.over25_short }} {{ m.over25 }} · {{ t.btts_short }} {{ m.btts_yes }}</span>
+    {% call lk(m=m.slug, own=true) %}{% if lk.pub %}<span class="mc-stats lkd" aria-hidden="true">{{ t.over25_short }} 00 % · {{ t.btts_short }} 00 %</span>{% else %}<span class="mc-stats">{{ t.over25_short }} {{ m.over25 }} · {{ t.btts_short }} {{ m.btts_yes }}</span>{% endif %}{% endcall %}
   </div>
   <div class="mc-body">
     <div class="mc-teams">
       <span class="team">{{ crest(m.home_crest) }}<span class="nm">{{ m.home.name }}</span></span>
       <span class="team">{{ crest(m.away_crest) }}<span class="nm">{{ m.away.name }}</span></span>
     </div>
-    <div class="boxes">
+    {% call lk(m=m.slug) %}<div class="boxes">
     {% for k, p in [('1', m.p1_txt), ('X', m.px_txt), ('2', m.p2_txt)] %}
       <span class="box{% if loop.index0 == m.best %} on{% endif %}"><small>{{ k }}</small><b>{{ p }}</b></span>
     {% endfor %}
-    </div>
+    </div>{% endcall %}
   </div>
 </a>
 {% endmacro %}

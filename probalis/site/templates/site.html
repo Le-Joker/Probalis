@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ s.title }}</title>
+<meta name="description" content="{{ s.description }}">
+<link rel="canonical" href="{{ site_url }}{{ here }}">
+<link rel="alternate" hreflang="fr" href="{{ site_url }}/">
+<link rel="alternate" hreflang="en" href="{{ site_url }}/welcome/">
+<link rel="alternate" hreflang="x-default" href="{{ site_url }}/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Probalis">
+<meta property="og:title" content="{{ s.title }}">
+<meta property="og:description" content="{{ s.description }}">
+<meta property="og:url" content="{{ site_url }}{{ here }}">
+<meta property="og:locale" content="{{ s.og_locale }}">
+<meta property="og:image" content="{{ site_url }}/icons/icone-512.png">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#071426" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/probalis-icone.svg" type="image/svg+xml">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+<link rel="preload" href="/assets/fonts/sora-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/jakarta-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/site.css?v={{ version }}">
+{# Avant l'affichage : appli déjà installée → on l'ouvre ; thème ; connexion lente ; installation proposée par le navigateur #}
+<script>(function(d,w){d.classList.add('js');try{if((w.matchMedia('(display-mode: standalone)').matches||navigator.standalone)&&d.referrer.indexOf(location.origin)!==0){location.replace('/app/');return}}catch(e){}try{var th=localStorage.getItem('theme');if(th)d.dataset.theme=th}catch(e){}var c=navigator.connection;if(c&&(c.saveData||/2g/.test(c.effectiveType||'')))d.classList.add('lite');w.addEventListener('beforeinstallprompt',function(e){e.preventDefault();w.__pbBip=e;d.classList.add('can-install')})})(document.documentElement,window)</script>
+<script type="application/ld+json">{{ ld|tojson }}</script>
+</head>
+<body>
+<a class="skip" href="#main">{{ s.skip }}</a>
+
+<div class="lang-banner" id="lang-banner" lang="{{ other }}" hidden>
+  <p class="wrap"><span>{{ s.lang_banner }}</span> <a href="{{ other_url }}" hreflang="{{ other }}">{{ s.lang_banner_link }}{{ icon('arrow', 16, 2.2) }}</a>
+  <button type="button" class="lb-x" aria-label="{{ s.close }}">{{ icon('x', 18, 2.2) }}</button></p>
+</div>
+
+<header class="hd">
+  <div class="wrap hd-in">
+    <a class="brand" href="{{ here }}" aria-label="Probalis">{{ logo_mark(34) }}<span class="wordmark" aria-hidden="true">Proba<span>lis</span></span></a>
+    <nav class="hd-nav" aria-label="{{ s.nav_label }}">
+      <a href="#visite">{{ s.nav_tour }}</a>
+      <a href="#preuve">{{ s.nav_proof }}</a>
+      <a href="#prix">{{ s.nav_price }}</a>
+      <a href="#installer">{{ s.nav_install }}</a>
+    </nav>
+    <div class="hd-act">
+      <a class="hd-lang" href="{{ other_url }}" hreflang="{{ other }}" lang="{{ other }}" aria-label="{{ s.other_lang_label }}" title="{{ s.other_lang_label }}">{{ s.other_lang_short }}</a>
+      <a class="btn btn-sm" href="{{ app }}">{{ s.open_app }}</a>
+    </div>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+
+<section class="hero" aria-labelledby="hero-h">
+  <div class="wrap hero-in">
+    <div class="hero-copy">
+      <p class="kicker">{{ s.hero_kicker }}</p>
+      <h1 id="hero-h">{{ s.hero_h1_html|safe }}</h1>
+      <p class="lead">{{ s.hero_lead }}</p>
+      <div class="cta-row">
+        <a class="btn btn-lg" href="#installer" data-go>{{ icon('download', 20, 2.2) }}<span>{{ s.hero_cta }}</span></a>
+        <a class="btn btn-lg btn-ghost" href="{{ app }}paris.html"><span>{{ s.hero_cta2 }}</span>{{ icon('arrow', 18, 2.2) }}</a>
+      </div>
+      <p class="trust">{{ s.hero_trust }}</p>
+    </div>
+    <div class="hero-stage">
+      <svg class="arc" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><circle class="arc-track" cx="100" cy="100" r="84"/><circle class="arc-fill" cx="100" cy="100" r="84" pathLength="100" stroke-dasharray="70 100"/></svg>
+      <figure class="phone ph-l">{{ shot('match', s.shot_alt_match, lazy=True) }}</figure>
+      <figure class="phone ph-r">{{ shot('ticket', s.shot_alt_ticket, lazy=True) }}</figure>
+      <figure class="phone ph-front">{{ shot('bets', s.shot_alt_bets, lazy=False) }}</figure>
+      <p class="chip chip-a" aria-hidden="true"><span class="chip-ring"></span><span><small>{{ s.chip_chance }}</small><b>{{ s.chip_chance_v }}</b></span></p>
+      <p class="chip chip-b" aria-hidden="true">{{ icon('target', 18, 2.2) }}<span><small>{{ s.chip_weak }}</small><b>{{ s.chip_weak_v }}</b></span></p>
+    </div>
+  </div>
+</section>
+
+{% if sim %}
+<section class="band proof" id="preuve" aria-labelledby="proof-h">
+  <div class="wrap proof-in">
+    <div class="proof-copy">
+      <h2 id="proof-h">{{ s.proof_h2 }}</h2>
+      <p>{{ s.proof_lead.format(season=sim.season, n=sim.n_txt) }}</p>
+      <p class="proof-note">{{ icon('info', 18, 2.2) }}<span>{{ s.proof_note.format(lo=sim.lo, hi=sim.hi) }} <a href="#cote">{{ s.proof_note_link }}</a></span></p>
+    </div>
+    <figure class="cal" id="cal">
+      <figcaption class="sr-only">{{ s.proof_caption.format(season=sim.season) }}</figcaption>
+      <p class="cal-legend" aria-hidden="true"><span class="lg-ann">{{ s.proof_announced }}</span><span class="lg-real">{{ s.proof_real }}</span></p>
+      {% for r in sim.rows %}
+      <div class="cal-row" style="--a:{{ '%.4f'|format(r.ann) }};--r:{{ '%.4f'|format(r.real) }}">
+        <p class="cal-name"><span class="dot dot-{{ r.key or 'coupon' }}"></span><b>{{ r.name }}</b><small>{{ s.proof_n.format(n=r.n_txt) }}</small></p>
+        <div class="cal-track" aria-hidden="true"><span class="cal-bar"></span><span class="cal-mark"></span></div>
+        <p class="cal-nums"><span class="cal-ann"><small>{{ s.proof_announced }}</small> <b data-to="{{ r.ann_int }}">{{ r.ann_txt }}</b></span><span class="cal-real"><small>{{ s.proof_real }}</small> <b data-to="{{ r.real_int }}">{{ r.real_txt }}</b></span></p>
+      </div>
+      {% endfor %}
+    </figure>
+  </div>
+</section>
+{% endif %}
+
+<section class="sec carnet" id="carnet" aria-labelledby="carnet-h">
+  <div class="wrap carnet-in">
+    <div class="carnet-copy">
+      <h2 id="carnet-h">{{ s.carnet_h2 }}</h2>
+      <p>{{ s.carnet_lead }}</p>
+      {% if record %}<p class="record">{{ icon('history', 18, 2.2) }}<span>{{ record }}</span></p>{% endif %}
+      <a class="more" href="{{ app }}historique.html">{{ s.carnet_history }}{{ icon('arrow', 18, 2.2) }}</a>
+    </div>
+    <div class="receipt-wrap">
+      <article class="receipt" aria-label="{{ s.carnet_title }}">
+        <header class="rc-head">
+          <span class="rc-brand">{{ logo_mark(26) }}<b>Probalis</b></span>
+          <span class="rc-title">{{ s.carnet_title }}{% if carnet %}<small>{{ carnet.day }}</small>{% endif %}</span>
+        </header>
+        {% if carnet and carnet.rows %}
+        <p class="rc-meta">{{ icon('lock', 15, 2.2) }}<span>{{ s.carnet_saved }} <time datetime="{{ carnet.built }}" data-dt>{{ carnet.when }}</time></span></p>
+        <ol class="rc-list">
+          {% for r in carnet.rows %}
+          <li class="rc-row">
+            <span class="rc-tier"><span class="dot dot-{{ r.tier }}"></span>{{ r.tier_name }}</span>
+            {% if r.locked %}
+            <span class="rc-main"><b class="rc-lock">{{ icon('lock', 15, 2.4) }}{{ s.carnet_locked }}</b><small>{{ r.match }}</small></span>
+            <span class="rc-p rc-p-lock" aria-hidden="true"><b>{{ icon('lock', 18, 2.4) }}</b></span>
+            {% else %}
+            <span class="rc-main"><b>{{ r.label }}</b><small>{{ r.match }}</small></span>
+            <span class="rc-p"><b>{{ r.pct }}</b><small>{{ r.times }}</small></span>
+            {% endif %}
+            <span class="rc-res res-{{ r.res }}">{{ r.res_txt }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+        <div class="rc-cut" aria-hidden="true"></div>
+        <footer class="rc-foot">
+          <p>{{ s.carnet_more.format(n=carnet.more, c=carnet.coupons) }}</p>
+          <a class="btn btn-sm" href="{{ app }}paris.html">{{ s.carnet_cta }}</a>
+        </footer>
+        {% else %}
+        <p class="rc-empty">{{ s.carnet_empty }}</p>
+        {% endif %}
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="sec tour" id="visite" aria-labelledby="tour-h">
+  <div class="wrap">
+    <h2 id="tour-h" class="tour-h">{{ s.tour_h2 }}</h2>
+    <div class="tour-grid">
+      <div class="tour-stage" aria-hidden="true">
+        <div class="phone tour-phone">
+          {% for c in s.tour %}{{ shot(c.shot, '', lazy=True, cls='tp' ~ (' on' if loop.first else ''), idx=loop.index0) }}{% endfor %}
+        </div>
+      </div>
+      <ol class="tour-list">
+        {% for c in s.tour %}
+        <li class="chap" data-i="{{ loop.index0 }}">
+          <p class="chap-tab">{{ icon(['ball', 'trend', 'ticket', 'history'][loop.index0], 18, 2.2) }}{{ c.tab }}</p>
+          <h3>{{ c.h3 }}</h3>
+          <p>{{ c.p }}</p>
+          <figure class="phone chap-phone">{{ shot(c.shot, s['shot_alt_' ~ c.shot], lazy=True) }}</figure>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+    <p class="tour-note">{{ s.tour_note }}</p>
+  </div>
+</section>
+
+<section class="band odds" id="cote" aria-labelledby="odds-h">
+  <div class="wrap odds-in">
+    <div class="odds-copy">
+      <h2 id="odds-h">{{ s.odds_h2 }}</h2>
+      <p>{{ s.odds_lead }}</p>
+      <form class="odds-form" id="odds-form" novalidate>
+        <label for="odds-in">{{ s.odds_label }}</label>
+        <input id="odds-in" name="odds" inputmode="decimal" autocomplete="off" enterkeyhint="done" value="{{ odds.value }}" aria-describedby="odds-err">
+        <p class="odds-err" id="odds-err" hidden>{{ s.odds_error }}</p>
+        <p class="odds-ex"><span>{{ s.odds_examples }}</span>{% for o in odds.examples %}<button type="button" data-o="{{ o }}">{{ o }}</button>{% endfor %}</p>
+      </form>
+    </div>
+    <div class="odds-out" id="odds-out">
+      <div aria-live="polite" aria-atomic="true">
+        <p class="oo-need">{{ s.odds_need }}</p>
+        <p class="oo-big" id="oo-big">{{ odds.big }}</p>
+        <p class="oo-pct" id="oo-pct">{{ odds.pct }}</p>
+      </div>
+      <div class="dots" id="oo-dots" aria-hidden="true">{% for i in range(10) %}<i style="--f:{{ odds.fills[i] }}"></i>{% endfor %}</div>
+      <p class="oo-margin" id="oo-margin">{{ odds.margin }}</p>
+      <p class="oo-cta">{{ s.odds_cta }} <a href="{{ app }}paris.html">{{ s.odds_cta_link }}{{ icon('arrow', 16, 2.2) }}</a></p>
+    </div>
+  </div>
+</section>
+
+{% if sim %}
+<section class="sec honest" id="honnete" aria-labelledby="honest-h">
+  <div class="wrap">
+    <div class="honest-head">
+      <h2 id="honest-h">{{ s.honest_h2 }}</h2>
+      <p>{{ s.honest_lead.format(season=sim.season) }}</p>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <caption>{{ s.honest_caption.format(season=sim.season) }}</caption>
+        <thead><tr><th scope="col">{{ s.th_list }}</th><th scope="col">{{ s.th_announced }}</th><th scope="col">{{ s.th_real }}</th><th scope="col">{{ s.th_roi }}</th></tr></thead>
+        <tbody>
+          {% for r in sim.table %}
+          <tr><th scope="row"{% if r.key %} class="nw"{% endif %}>{% if r.key %}<span class="dot dot-{{ r.key }}"></span>{% endif %}{{ r.name }}</th><td>{{ r.ann_txt }}</td><td>{{ r.real_txt }}</td><td class="{{ 'neg' if r.roi < 0 else 'pos' }}">{{ r.roi_txt }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <ul class="promises">
+      {% for h, p in s.promises %}<li>{{ icon('check', 20, 2.4) }}<span><b>{{ h }}</b>{{ p }}</span></li>{% endfor %}
+    </ul>
+    <p class="resp">{{ icon('shield', 22, 2) }}<span>{{ s.responsible_html|safe }} <a href="{{ app }}jeu-responsable.html">{{ s.responsible_link }}</a></span></p>
+  </div>
+</section>
+{% endif %}
+
+<section class="sec comp" id="competitions" aria-labelledby="comp-h">
+  <div class="wrap">
+    <div class="comp-head">
+      <h2 id="comp-h">{{ s.comp_h2 }}</h2>
+      <p>{{ s.comp_lead }}</p>
+    </div>
+    <div class="comp-grid">
+      {% for g in groups %}
+      <div class="comp-g">
+        <h3>{{ g.title }}</h3>
+        <ul>{% for l in g.leagues %}<li><b>{{ l.name }}</b><small>{{ l.country }}</small></li>{% endfor %}</ul>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="sec price" id="prix" aria-labelledby="price-h">
+  <div class="wrap">
+    <div class="price-head">
+      <h2 id="price-h">{{ s.price_h2 }}</h2>
+      <div class="cur" role="group" aria-label="{{ s.price_cur_label }}">
+        {% for c in prices.list %}<button type="button" data-cur="{{ c.code }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ c.label }}</button>{% endfor %}
+      </div>
+    </div>
+    <div class="plans">
+      <article class="plan plan-free" aria-labelledby="plan-free-h">
+        <h3 id="plan-free-h">{{ s.free_name }}</h3>
+        <p class="plan-price"><b data-p="free">{{ prices.first.free }}</b><span>{{ s.free_unit }}</span></p>
+        <ul>{% for it in s.free_items %}<li>{{ icon('check', 18, 2.4) }}{{ it }}</li>{% endfor %}</ul>
+        <a class="btn btn-ghost" href="{{ app }}compte.html">{{ s.free_cta }}</a>
+      </article>
+      <article class="plan plan-prem" aria-labelledby="plan-prem-h">
+        <h3 id="plan-prem-h">{{ icon('crown', 20, 2.2) }}{{ s.prem_name }}</h3>
+        <p class="plan-price"><span>{{ s.prem_from }}</span><b data-p="week">{{ prices.first.week }}</b><span>{{ s.prem_from_unit }}</span></p>
+        <ul class="passes" aria-label="{{ s.passes_label }}">
+          {% for k in prices.plans %}<li{% if loop.last %} class="top"{% endif %}><span class="ps-name">{{ s.pass_names[k] }}{% if loop.last %}<small>{{ s.pass_best }}</small>{% endif %}</span><em data-p="{{ k }}_save"{% if not prices.first[k ~ '_save'] %} hidden{% endif %}>{{ prices.first[k ~ '_save'] }}</em><b data-p="{{ k }}">{{ prices.first[k] }}</b></li>
+          {% endfor %}
+        </ul>
+        <p class="passes-note">{{ s.save_note }}</p>
+        <ul>{% for it in s.prem_items %}<li>{{ icon('check', 18, 2.4) }}{{ it }}</li>{% endfor %}</ul>
+        <p class="plan-note">{{ s.prem_note }}</p>
+        <a class="btn" href="{{ app }}premium.html">{{ s.prem_cta }}</a>
+      </article>
+    </div>
+  </div>
+  <script id="pb-prices" type="application/json">{{ prices.table|tojson }}</script>
+</section>
+
+<section class="sec inst" id="installer" aria-labelledby="inst-h">
+  <div class="wrap inst-in">
+    <div class="inst-copy">
+      <h2 id="inst-h">{{ s.inst_h2 }}</h2>
+      <p>{{ s.inst_lead }}</p>
+    </div>
+    <div class="inst-card" id="inst">
+      <div class="ip ip-prompt">
+        <button class="btn btn-lg" type="button" data-install>{{ icon('download', 20, 2.2) }}<span>{{ s.inst_prompt_btn }}</span></button>
+        <p class="ip-help">{{ s.inst_prompt_help }}</p>
+      </div>
+      <div class="ip ip-inapp">
+        <h3>{{ s.inst_inapp_h }}</h3>
+        <p>{{ s.inst_inapp }}</p>
+        <button class="btn btn-ghost" type="button" data-copy="{{ site_url }}{{ here }}">{{ icon('copy', 18, 2.2) }}<span>{{ s.inst_copy }}</span></button>
+        <p class="ip-copied" role="status"></p>
+      </div>
+      <div class="ip ip-android">
+        <h3>{{ icon('phone', 20, 2.2) }}{{ s.inst_android_h }}</h3>
+        <ol class="steps">{% for st in s.inst_android %}<li>{{ st }}</li>{% endfor %}</ol>
+      </div>
+      <div class="ip ip-ios">
+        <h3>{{ icon('phone', 20, 2.2) }}{{ s.inst_ios_h }}</h3>
+        <ol class="steps">{% for st in s.inst_ios %}<li>{{ st }}</li>{% endfor %}</ol>
+      </div>
+      <div class="ip ip-desktop">
+        <div class="qr-box">{{ qr }}</div>
+        <div class="qr-copy">
+          <h3>{{ s.inst_desk_h }}</h3>
+          <p>{{ s.inst_desk }}</p>
+          <button class="btn btn-ghost desk-install" type="button" data-install>{{ icon('laptop', 18, 2.2) }}<span>{{ s.inst_desk_install }}</span></button>
+        </div>
+      </div>
+      <div class="ip ip-done">
+        <h3>{{ icon('check', 22, 2.6) }}{{ s.inst_done_h }}</h3>
+        <p>{{ s.inst_done }}</p>
+        <a class="btn" href="{{ app }}">{{ s.inst_done_open }}</a>
+      </div>
+      <p class="ip-nothing">{{ s.inst_nothing }} <a href="{{ app }}">{{ s.inst_nothing_link }}{{ icon('arrow', 16, 2.2) }}</a></p>
+    </div>
+  </div>
+</section>
+
+<section class="sec faq" id="faq" aria-labelledby="faq-h">
+  <div class="wrap faq-in">
+    <h2 id="faq-h">{{ s.faq_h2 }}</h2>
+    <div class="faq-list">
+      {% for q, a in s.faq %}
+      <details><summary><span>{{ q }}</span>{{ icon('plus', 20, 2.2) }}</summary><p>{{ a.format(week=prices.first.week, month=prices.first.month, year=prices.first.year) }}</p></details>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="ft">
+  <div class="wrap">
+    <div class="ft-top">
+      <p class="ft-line">{{ s.final_line }}</p>
+      <a class="btn btn-lg" href="#installer" data-go>{{ icon('download', 20, 2.2) }}<span>{{ s.hero_cta }}</span></a>
+    </div>
+    <div class="ft-cols">
+      <div class="ft-brand">
+        <a class="brand" href="{{ here }}" aria-label="Probalis">{{ logo_mark(34) }}<span class="wordmark" aria-hidden="true">Proba<span>lis</span></span></a>
+        <p>{{ s.foot_tagline }}</p>
+      </div>
+      <nav aria-labelledby="ft-app">
+        <h3 id="ft-app">{{ s.foot_app }}</h3>
+        <ul>
+          <li><a href="{{ app }}">{{ s.foot_matches }}</a></li>
+          <li><a href="{{ app }}paris.html">{{ s.foot_bets }}</a></li>
+          <li><a href="{{ app }}ticket.html">{{ s.foot_ticket }}</a></li>
+          <li><a href="{{ app }}historique.html">{{ s.foot_history }}</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="ft-more">
+        <h3 id="ft-more">{{ s.foot_more }}</h3>
+        <ul>
+          <li><a href="{{ app }}premium.html">{{ s.foot_premium }}</a></li>
+          <li><a href="{{ app }}jeu-responsable.html">{{ t.legal_responsible }}</a></li>
+          <li><a href="{{ app }}conditions.html">{{ t.legal_terms }}</a></li>
+          <li><a href="{{ app }}confidentialite.html">{{ t.legal_privacy }}</a></li>
+        </ul>
+      </nav>
+      <div>
+        <h3>{{ s.foot_contact }}</h3>
+        <ul>
+          {% if contact %}<li><a href="mailto:{{ contact }}">{{ contact }}</a></li>{% endif %}
+          <li><a href="{{ other_url }}" hreflang="{{ other }}" lang="{{ other }}">{{ s.other_lang_label }}</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="ft-resp">{{ t.responsible }}</p>
+    <p class="ft-small">{{ t.data_credit }} © {{ year }} Probalis</p>
+  </div>
+</footer>
+
+<script id="pb-site" type="application/json">{{ js|tojson }}</script>
+<script src="/assets/site.js?v={{ version }}" defer></script>
+</body>
+</html>

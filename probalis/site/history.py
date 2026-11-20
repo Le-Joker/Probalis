@@ -2,7 +2,8 @@
 
 Le fichier vit sur le site lui-même (/data/history.json) : chaque construction relit la version en ligne,
 y ajoute les listes des jours à venir et les résultats des matchs terminés, puis la republie.
-Une copie est gardée dans data/cache/history.json (utile si le site est momentanément injoignable).
+La version en ligne ne montre que les paris réglés : les paris en attente sont des contenus Premium, ils n'y
+figurent pas (le jour est alors marqué « sealed »). La version complète est gardée dans data/cache/history.json.
 
 Règle d'honnêteté : la liste d'un jour est figée dès le premier calcul fait ce jour-là (ou plus tard) ;
 ensuite elle ne change plus, même si le modèle change d'avis. Les listes des jours suivants restent
@@ -52,15 +53,38 @@ def _settled(entry: dict) -> int:
     return sum(1 for mt in entry.get("matches", {}).values() if mt.get("score") or mt.get("void"))
 
 
+def _rank(e: dict) -> tuple:
+    """Ordre de préférence d'une version d'un jour : figée, complète (pas « sealed »), puis la plus réglée."""
+    return (bool(e.get("frozen")), not e.get("sealed"), _settled(e))
+
+
 def merge(a: dict | None, b: dict | None) -> dict:
-    """Réunit deux versions : pour chaque jour, la liste figée d'abord, puis celle qui a le plus de résultats."""
+    """Réunit deux versions : pour chaque jour, la liste figée d'abord, complète ensuite, puis la plus réglée."""
     out = _empty()
     for src in (a, b):
         for day, e in ((src or {}).get("days") or {}).items():
             cur = out["days"].get(day)
-            if cur is None or (e.get("frozen") and not cur.get("frozen")) or \
-                    (e.get("frozen") == cur.get("frozen") and _settled(e) > _settled(cur)):
+            if cur is None or _rank(e) > _rank(cur):
                 out["days"][day] = e
+    return out
+
+
+def public_copy(hist: dict) -> dict:
+    """Ce qui est publié : seulement les paris et coupons déjà réglés (les autres sont réservés au Premium)."""
+    out = {k: v for k, v in hist.items() if k != "days"}
+    out["days"] = {}
+    for day, e in (hist.get("days") or {}).items():
+        tiers = {t: [c for c in lst if c.get("res")] for t, lst in (e.get("tiers") or {}).items()}
+        coupons = [cp for cp in e.get("coupons") or [] if cp.get("res")]
+        hidden = sum(len(lst) for lst in (e.get("tiers") or {}).values()) + len(e.get("coupons") or []) \
+            - sum(len(lst) for lst in tiers.values()) - len(coupons)
+        used = {c["mid"] for lst in tiers.values() for c in lst} | {c["mid"] for cp in coupons for c in cp["legs"]}
+        d = {k: v for k, v in e.items() if k not in ("tiers", "coupons", "matches")}
+        d.update(tiers=tiers, coupons=coupons,
+                 matches={mid: mt for mid, mt in (e.get("matches") or {}).items() if mid in used})
+        if hidden:
+            d["sealed"] = hidden
+        out["days"][day] = d
     return out
 
 
@@ -200,11 +224,11 @@ def _apply_results(e: dict) -> None:
 def save(hist: dict, public_dir: Path, now: datetime) -> None:
     hist["version"] = VERSION
     hist["updated"] = now.isoformat(timespec="seconds")
-    txt = json.dumps(hist, ensure_ascii=False, separators=(",", ":"))
     LOCAL.parent.mkdir(parents=True, exist_ok=True)
-    LOCAL.write_text(txt, encoding="utf-8")
+    LOCAL.write_text(json.dumps(hist, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     public_dir.mkdir(parents=True, exist_ok=True)
-    (public_dir / "history.json").write_text(txt, encoding="utf-8")
+    (public_dir / "history.json").write_text(json.dumps(public_copy(hist), ensure_ascii=False, separators=(",", ":")),
+                                             encoding="utf-8")
 
 
 # --- Bilan ------------------------------------------------------------------------------------------------

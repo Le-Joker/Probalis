@@ -345,10 +345,28 @@
       } catch (e) {}
       return false;
     };
+    // Jeton de connexion, envoyé au serveur des chiffres protégés (qui le vérifie auprès de Supabase)
+    var token = function () {
+      if (demo) return Promise.resolve(state && state.user ? 'demo' : null);
+      if (!hasToken()) return Promise.resolve(null);
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (!/^sb-.+-auth-token$/.test(k)) continue;
+          var o = JSON.parse(localStorage.getItem(k) || 'null');
+          if (o && o.access_token && o.expires_at && o.expires_at * 1000 > Date.now() + 60e3) return Promise.resolve(o.access_token);
+        }
+      } catch (e) {}
+      return sb().then(function (c) { return c.auth.getSession(); }).then(function (r) {
+        var ses = r && r.data && r.data.session;
+        return ses ? ses.access_token : null;
+      }, function () { return null; });
+    };
     return {
       demo: demo,
       get: function () { return state; },
       premium: isPremium,
+      token: token,
       on: function (fn, alive) { listeners.push({ fn: fn, alive: alive }); },
       api: B,
       hasToken: hasToken,
@@ -914,6 +932,13 @@
         var days = (P.plans[k] || { days: 1 }).days;
         el.textContent = fmt(T.per_day, { p: money(c[k] / days, code, c.decimals ? 2 : 0) });
       });
+      var monthDay = c.month / (P.plans.month || { days: 30 }).days;
+      $$('[data-save]', scope).forEach(function (el) {
+        var k = el.dataset.save;
+        var n = Math.round((1 - c[k] / (P.plans[k] || { days: 1 }).days / monthDay) * 100);
+        el.hidden = !(n >= 5);
+        el.textContent = fmt(T.save, { n: n });
+      });
       $$('.plan', plansEl).forEach(function (b) {
         var on = b.dataset.plan === plan;
         b.classList.toggle('on', on);
@@ -1027,6 +1052,139 @@
   };
 
   // =====================================================================================================
+  // Chiffres protégés. La page publique n'a que des formes vides sous cadenas (<!--lk:N--> … <!--/lk-->) :
+  // aucun chiffre Premium n'est dans le code de la page. Pour un compte qui y a droit, on demande les vrais
+  // blocs au serveur (/lk/…), qui vérifie le compte auprès de Supabase avant de répondre, puis on les remet à
+  // leur place. Rien n'est enregistré sur le téléphone (seulement gardé en mémoire quelques minutes).
+  // =====================================================================================================
+  var Lk = (function () {
+    var mem = {};
+    var memLvl = null;
+    var retried = {};
+    // '' : pas connecté ; 'p' : Premium ; 'f' ou 'f:<match>' : gratuit (avec l'analyse gratuite du jour)
+    var level = function () {
+      var s = Acct.get();
+      if (!s || !s.user) return '';
+      if (Acct.premium()) return 'p';
+      var f = Free.get();
+      return 'f' + (f && f.m ? ':' + f.m : '');
+    };
+    var json = function (url) {
+      var lvl = level();
+      if (memLvl !== lvl) { mem = {}; memLvl = lvl; }
+      var hit = mem[url];
+      if (hit && Date.now() - hit.t < 5 * 60e3) return hit.p;
+      var p = Acct.token().then(function (tok) {
+        if (!tok) throw new Error('token');
+        return fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { Authorization: 'Bearer ' + tok } });
+      }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      });
+      mem[url] = { p: p, t: Date.now() };
+      p.catch(function () { if (mem[url] && mem[url].p === p) delete mem[url]; });
+      return p;
+    };
+    var pageOf = function (path) {
+      var rest = path.replace(/^\/[a-z]{2}(\/|$)/, '').replace(/\.html$/, '').replace(/\/$/, '');
+      return rest || 'index';
+    };
+    // Les vrais blocs d'une page pour ce compte : { v: version du site, b: { n° du bloc: html } }, ou null
+    var forPage = function (path) {
+      var lvl = level();
+      if (!lvl) return Promise.resolve(null);
+      var pg = pageOf(path);
+      var base = '/lk/' + lang + '/';
+      if (lvl === 'p') {
+        return json(base + pg + '.json').then(function (j) { return { v: j.v, b: j.b || {} }; }, function () { return null; });
+      }
+      var f = Free.get();
+      var parts = [json(base + 'free.json').catch(function () { return null; })];
+      if (f && f.m) parts.push(json(base + 'm/' + f.m + '.json').catch(function () { return null; }));
+      return Promise.all(parts).then(function (all) {
+        var out = { v: null, b: {} };
+        all.forEach(function (j) {
+          if (!j) return;
+          out.v = out.v || j.v;
+          Object.assign(out.b, (j.p || {})[pg] || {});
+        });
+        return out.v ? out : null;
+      });
+    };
+    // Données du constructeur de coupons : tous les matchs (Premium), le match de l'analyse gratuite, ou rien
+    var ticket = function (src) {
+      var lvl = level();
+      if (lvl === 'p') return json(src);
+      var f = Free.get();
+      if (!f || !f.m) return Promise.resolve({ matches: [], limited: lvl ? 'none' : 'anon' });
+      return json('/lk/' + lang + '/m/' + f.m + '.json').then(function (j) {
+        return { matches: j.tk ? [j.tk] : [], limited: 'free' };
+      }, function () { return { matches: [], limited: 'none' }; });
+    };
+    var marks = function (root) {
+      var out = [];
+      if (!root) return out;
+      var w = doc.createTreeWalker(root, 128);  // NodeFilter.SHOW_COMMENT
+      var n;
+      while ((n = w.nextNode())) if (n.data.slice(0, 3) === 'lk:') out.push(n);
+      return out;
+    };
+    var has = function (root) { return marks(root).length > 0; };
+    // Remet les vrais blocs. false si la page et les blocs ne viennent pas de la même version du site.
+    var apply = function (app, fr) {
+      if (!fr || !fr.b || !app) return true;
+      if (app.dataset.v && fr.v && app.dataset.v !== fr.v) return false;
+      marks(app).forEach(function (c) {
+        var html = fr.b[c.data.slice(3)];
+        if (html == null) return;
+        var old = [];
+        var n = c.nextSibling;
+        while (n && !(n.nodeType === 8 && n.data === '/lk')) { old.push(n); n = n.nextSibling; }
+        if (!n) return;
+        var tpl = doc.createElement('template');
+        tpl.innerHTML = html;
+        old.forEach(function (x) { x.parentNode.removeChild(x); });
+        n.parentNode.insertBefore(tpl.content, n);
+      });
+      return true;
+    };
+    // Page d'une autre version (gardée sur le téléphone) : on la recharge une fois
+    var stale = function () {
+      var k = location.pathname;
+      mem = {};
+      if (retried[k]) return;
+      retried[k] = 1;
+      setTimeout(function () { router.reload(); }, 30);
+    };
+    // Premier affichage : on attend un peu les vrais blocs avant de préparer la page, sinon on la recharge à leur arrivée
+    var boot = function (start) {
+      var app0 = doc.querySelector('.app');
+      if (!level() || !has(app0)) { start(); return; }
+      var done = false;
+      var run = function () { if (app0.isConnected) start(); };
+      var t = setTimeout(function () { done = true; run(); }, 1500);
+      forPage(location.pathname).then(function (fr) {
+        if (!done) {
+          done = true;
+          clearTimeout(t);
+          if (fr && !apply(app0, fr)) stale();
+          run();
+        } else if (fr && app0.isConnected) router.reload();
+      });
+    };
+    // Compte changé (connexion, Premium, analyse gratuite choisie, déconnexion) : la page est reconstruite
+    var lastLvl = level();
+    Acct.on(function () {
+      var l = level();
+      if (l === lastLvl) return;
+      lastLvl = l;
+      mem = {};
+      if (has(doc.querySelector('.app'))) router.reload();
+    }, function () { return true; });
+    return { level: level, forPage: forPage, ticket: ticket, apply: apply, stale: stale, boot: boot };
+  })();
+
+  // =====================================================================================================
   // Ticket : enregistré sur le téléphone, rempli depuis l'onglet Paris, les pages de match et l'onglet Ticket
   // =====================================================================================================
   var MARGIN = 0.05;     // marge moyenne d'un bookmaker sur un marché classique
@@ -1044,6 +1202,16 @@
   var timesTxt = function (p) {
     if (p >= 0.095) return fmt(T.tk_times, { n: Math.max(1, Math.min(9, Math.round(p * 10))) });
     return fmt(T.tk_times100, { n: Math.max(1, Math.round(p * 100)) });
+  };
+  // « Sur 10 tickets comme celui-ci, environ 2 passent et 8 perdent » : le vrai chiffre du ticket, pas un exemple
+  var explainTxt = function (p) {
+    var win = function (n) { return n > 1 ? T.tk_winN : T.tk_win1; };
+    if (p >= 0.095) {
+      var w = Math.max(1, Math.min(9, Math.round(p * 10))), l = 10 - w;
+      return fmt(T.tk_explain10, { w: w, l: l, wv: win(w), lv: l > 1 ? T.tk_loseN : T.tk_lose1 });
+    }
+    var h = Math.max(1, Math.round(p * 100));
+    return fmt(T.tk_explain100, { w: h, wv: win(h) });
   };
   var esc = function (s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -1264,12 +1432,12 @@
 
   var TData = {
     p: null,
+    lvl: null,
     get: function (src) {
+      var lvl = Lk.level();
+      if (TData.lvl !== lvl) { TData.p = null; TData.lvl = lvl; }
       if (!TData.p) {
-        TData.p = fetch(src, { credentials: 'same-origin' }).then(function (r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        });
+        TData.p = Lk.ticket(src);
         TData.p.catch(function () { TData.p = null; });
       }
       return TData.p;
@@ -1348,7 +1516,8 @@
     var select = scope.querySelector('#cmp-sel');
     var sync = function () {
       var id = select.value;
-      var it = data.items[id];
+      var it = data.items && data.items[id];
+      if (!it) { btn.removeAttribute('data-add'); return; }
       var parts = id.split('|');
       var line = parts[1] === 'None' ? null : parseFloat(parts[1]);
       var opt = select.options[select.selectedIndex];
@@ -1487,6 +1656,7 @@
       lockMore.hidden = !over;
       $('#tk-ring').innerHTML = ringHtml(st.p, 'big');
       $('#tk-times').textContent = timesTxt(st.p);
+      $('#tk-explain').textContent = explainTxt(st.p);
       $('#tk-count').textContent = legs.length === 1 ? T.tk_1 : fmt(T.tk_n, { n: legs.length });
       $('#tk-fair').textContent = oddsTxt(st.fair);
       $('#tk-book').textContent = '≈ ' + oddsTxt(st.book);
@@ -1549,6 +1719,11 @@
       if (picker.hidden || pdata) return;
       withData(function (d) {
         pdata = d;
+        var lim = $('#tk-limit');
+        if (lim) {
+          lim.hidden = !d.limited;
+          lim.textContent = d.limited ? T['tk_lim_' + d.limited] : '';
+        }
         fillDays(daySel, d);
         fillMatches();
       });
@@ -1740,7 +1915,7 @@
       try { history.replaceState(Object.assign({}, history.state, { pb: 1, scroll: win.scrollY }), ''); } catch (e) {}
     };
 
-    var swap = function (html, k, opts) {
+    var swap = function (html, k, opts, fr) {
       var d = new DOMParser().parseFromString(html, 'text/html');
       var app = d.querySelector('.app');
       var bar = d.querySelector('.tabbar');
@@ -1757,6 +1932,7 @@
       if (alt && myAlt) myAlt.setAttribute('href', alt.getAttribute('href'));
       doc.body.className = d.body.className;
       app = doc.adoptNode(app);
+      if (fr && !Lk.apply(app, fr)) Lk.stale();
       doc.querySelector('.app').replaceWith(app);
       doc.querySelector('.tabbar').replaceWith(doc.adoptNode(bar));
       if (opts.push) history.pushState({ pb: 1, scroll: 0 }, '', k.url.href);
@@ -1783,10 +1959,14 @@
       ctrl = win.AbortController ? new AbortController() : null;
       if (!opts.pop) saveScroll();
       setTab(k.url.pathname);
+      var frP = Lk.forPage(k.url.pathname);
       var hit = cache[k.key];
       var maxAge = opts.pop ? 30 * 60e3 : FRESH;
-      if (hit && Date.now() - hit.t < maxAge) {
-        if (!swap(hit.html, k, opts)) location.href = k.url.href;
+      if (hit && !opts.fresh && Date.now() - hit.t < maxAge) {
+        frP.then(function (fr) {
+          if (my !== seq) return;
+          if (!swap(hit.html, k, opts, fr)) location.href = k.url.href;
+        });
         return;
       }
       progress.start();
@@ -1802,11 +1982,11 @@
         win.scrollTo(0, 0);
       }, 120);
       var slowT = setTimeout(function () { if (my === seq) netbar.slow(); }, 3000);
-      load(k.key, ctrl && ctrl.signal, progress.data).then(function (html) {
+      Promise.all([load(k.key, ctrl && ctrl.signal, progress.data), frP]).then(function (r) {
         clearTimeout(skT);
         clearTimeout(slowT);
         if (my !== seq) return;
-        if (!swap(html, k, opts)) { location.href = k.url.href; return; }
+        if (!swap(r[0], k, opts, r[1])) { location.href = k.url.href; return; }
         progress.done();
       }).catch(function (err) {
         clearTimeout(skT);
@@ -1863,11 +2043,13 @@
       };
       if (win.requestIdleCallback) win.requestIdleCallback(idle, { timeout: 6000 }); else setTimeout(idle, 3000);
     };
-    return { start: start, go: go };
+    // Même page, reconstruite (compte changé, vrais chiffres arrivés) en gardant la position
+    var reload = function () { if (supported) go(location.href, { pop: true, fresh: true, scroll: win.scrollY }); };
+    return { start: start, go: go, reload: reload };
   })();
 
-  init(doc);
   router.start();
+  Lk.boot(function () { init(doc); });
   Acct.boot();
 
   // ---------- Application installable et utilisable hors connexion ----------

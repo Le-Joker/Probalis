@@ -45,7 +45,7 @@
   {% if d.empty %}<p class="empty">{{ t.no_picks_day }}</p>{% endif %}
   {% for k in tiers %}{% if d.tiers[k] %}
   <h3 class="plist-h"><i class="tdot {{ k }}" aria-hidden="true"></i>{{ t['tier_' ~ k] }}</h3>
-  <div class="picks">{% for e in d.tiers[k] %}{{ pick_card(e, hist=true) }}{% endfor %}</div>
+  <div class="picks">{% for e in d.tiers[k] %}{{ pick_card(e, loop.first and d.is_today, hist=true) }}{% endfor %}</div>
   {% endif %}{% endfor %}
   {% if d.coupons %}
   <h3 class="plist-h">{{ icon('ticket', 16, 2.2) }}{{ t.coupons_title }}</h3>

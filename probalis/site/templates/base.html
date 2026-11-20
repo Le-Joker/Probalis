@@ -20,7 +20,7 @@
 <script>(function(d){d.classList.add('js');try{var th=localStorage.getItem('theme');if(th)d.dataset.theme=th;localStorage.setItem('lang','{{ lang }}');var a=JSON.parse(localStorage.getItem('pb-acct')||'null');if(a&&a.user){d.classList.add('signed');if(a.profile&&a.profile.premium_until&&new Date(a.profile.premium_until)>new Date())d.classList.add('premium')}}catch(e){}var c=navigator.connection;if(c&&(c.saveData||/2g/.test(c.effectiveType||'')))d.classList.add('lite')})(document.documentElement)</script>
 </head>
 <body class="page-{{ page }}">
-<div class="app">
+<div class="app" data-v="{{ version }}">
 {% block header %}
 <header class="top">
   <a class="brand" href="{{ root }}index.html" aria-label="Probalis">{{ logo_mark(36) }}<span class="wordmark" aria-hidden="true">Proba<span>lis</span></span></a>
@@ -40,9 +40,11 @@
 </footer>
 </div>
 <nav class="tabbar" aria-label="{{ t.nav_label }}">
+  <a class="tb-brand" href="{{ root }}index.html" aria-label="Probalis">{{ logo_mark(34) }}<span class="wordmark" aria-hidden="true">Proba<span>lis</span></span></a>
 {% for key, href, ic, label in [('matches', 'index.html', 'ball', t.tab_matches), ('bets', 'paris.html', 'trend', t.tab_bets), ('ticket', 'ticket.html', 'ticket', t.tab_ticket), ('historique', 'historique.html', 'history', t.tab_history), ('compte', 'compte.html', 'user', t.tab_account)] %}
   <a href="{{ root }}{{ href }}" data-tab="{{ key }}" title="{{ label }}"{% if page == key %} aria-current="page"{% endif %}>{{ icon(ic, 24) }}<span class="tl">{{ label }}</span></a>
 {% endfor %}
+  <a class="tb-site" href="{{ '/' if lang == 'fr' else '/welcome/' }}">{{ icon('info', 20, 2.2) }}<span>{{ t.site_link }}</span></a>
 </nav>
 <script id="pb-i18n" type="application/json">{{ js|tojson }}</script>
 <script id="pb-config" type="application/json">{{ cfg|tojson }}</script>

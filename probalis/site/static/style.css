@@ -640,6 +640,14 @@ html.js .crest img.ld, html.js .lgl img.ld { opacity: 1; }
 html.premium .ad { display: none; }
 
 /* ---------- Marchés Premium ---------- */
+/* Contenu Premium verrouillé : un cache plein et un cadenas, aucune couleur ni barre ne transparaît */
+:root { --lk-bg: var(--chip);
+  --lk-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238A99AD' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='10.5' width='14' height='10' rx='2.5'/%3E%3Cpath d='M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3'/%3E%3C/svg%3E"); }
+.hero, .featured { --lk-bg: rgba(255, 255, 255, .1); }
+.bar3, .split, .mc-stats, .f-chips, .pk-txt > b, .pk-txt > small, .cmp-chance { --lk-ic: none; --lk-r: 7px; }
+.pcts b { --lk-sz: 14px; --lk-r: 8px; }
+.ring { --lk-r: 50%; }
+
 .lock-pill { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border-radius: 999px;
   background: var(--gold-bg); color: var(--gold-ink); font-size: 11.5px; font-weight: 800; }
 .tab-lock { display: inline-flex; margin-left: 2px; opacity: .65; }
@@ -655,13 +663,15 @@ html.premium .ad { display: none; }
 .lock-card p { margin: 6px 0 14px; font-size: 13px; line-height: 1.5; color: var(--night-3); }
 .lock-card .btn { width: 100%; }
 .lock-card small { display: block; margin-top: 10px; font-size: 11.5px; line-height: 1.45; color: var(--night-2); }
-/* Gratuit : 1 analyse complète par jour, sur le match choisi (.app.free-ok) ; ailleurs les chiffres sont floutés.
-   Premium (html.premium) : tout est visible. Sans JavaScript, rien n'est flouté. */
-html.js:not(.premium) .app:not(.free-ok) .card.locked :is(.rows, .tiles, .scores, .xg, .split, .otable, .cmp-grid, .cmp-chance, .verdict),
-html.js:not(.premium) .app:not(.free-ok) .hero.locked :is(.bar3, .pcts b),
-html.js:not(.premium) .mcard:not(.free-ok) :is(.boxes, .mc-stats),
-html.js:not(.premium) .featured:not(.free-ok) :is(.bar3, .pcts b, .f-chips) {
-  filter: blur(5px); opacity: .75; user-select: none; -webkit-user-select: none; pointer-events: none; }
+/* Chiffres protégés : la page publique ne contient qu'une forme vide (.lkd, cadenas ; .lkh, bouton caché). Le vrai
+   bloc ne remplace la forme vide que pour un compte qui y a droit, après vérification par le serveur : Premium,
+   l'analyse gratuite du jour (1 match), le n° 1 de chaque liste de paris. Voir lock.py et guard.js. */
+.lkd {
+  position: relative; user-select: none; -webkit-user-select: none; pointer-events: none;
+  color: transparent !important; border-color: transparent !important; box-shadow: none !important;
+  background: var(--lk-bg) var(--lk-ic) center / var(--lk-sz, 22px) no-repeat !important; border-radius: var(--lk-r, 12px); }
+.lkd * { visibility: hidden; }
+.lkh { display: none !important; }
 html.js:not(.premium) .app:not(.free-ok) .card.locked .legend { display: none; }
 html.premium .lock-pill, html.premium .lock-card, html.premium .tab-lock, html.premium .lock-row,
 html.premium .free-card, html.premium .list-lock, .app.free-ok .lock-card, .app.free-ok .tab-lock,
@@ -780,14 +790,21 @@ html:not(.js) .acct-loading { display: none; }
 .plans-head { margin-top: 22px; }
 .field.country { margin-top: 10px; color: var(--ink-2); }
 .field.country select { border-color: var(--line-2); }
-.plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
-.plan { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 16px 14px 14px;
-  border-radius: 20px; border: 2px solid var(--line-2); background: var(--surface); text-align: left; }
-.plan b { font-size: 14px; font-weight: 800; }
-.plan .price { font-size: 23px; font-weight: 700; letter-spacing: -.5px; white-space: nowrap; }
-.plan small { min-height: 1.2em; font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
+.plans { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.plan { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "rd name price" "rd per save";
+  align-items: center; gap: 2px 12px; min-width: 0; padding: 14px 16px; border-radius: 18px; border: 2px solid var(--line-2);
+  background: var(--surface); color: var(--ink); text-align: left; transition: border-color .15s ease, background-color .15s ease; }
+.plan .rd { grid-area: rd; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line-2); transition: border .15s ease; }
+.plan.on .rd { border: 6px solid var(--green); }
+.plan b { grid-area: name; font-size: 14.5px; font-weight: 800; }
+.plan .price { grid-area: price; justify-self: end; font-size: 19px; font-weight: 700; letter-spacing: -.4px; white-space: nowrap; }
+.plan small { grid-area: per; min-height: 1.2em; font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
+.plan .save { grid-area: save; justify-self: end; padding: 2px 8px; border-radius: 999px; background: var(--green-soft); color: var(--green-ink);
+  font-size: 11.5px; font-weight: 800; white-space: nowrap; }
 .plan.on { border-color: var(--green); background: var(--green-soft); }
-.plan .best { position: absolute; top: -11px; left: 12px; padding: 3px 9px; border-radius: 999px; background: var(--green); color: var(--on-green);
+.plan.on .save { background: var(--green); color: var(--on-green); }
+.save-note { margin-top: 10px; }
+.plan .best { position: absolute; top: -10px; right: 14px; padding: 3px 9px; border-radius: 999px; background: var(--green); color: var(--on-green);
   font-size: 11px; font-weight: 800; white-space: nowrap; }
 .methods { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 14px 0 0; font-size: 12.5px; font-weight: 700;
   color: var(--ink-2); text-align: center; }
@@ -889,13 +906,8 @@ html.js .pday-h, html.js .pday .plist-h { display: none; }
 .rel-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; font-size: 13px; font-weight: 800; color: #4ADE80; }
 .link { display: inline-flex; align-items: center; gap: 2px; margin-top: 8px; font-weight: 800; color: var(--green-ink); }
 
-/* Gratuit : le n°1 de chaque liste avec un compte ; Premium : tout. Les paris déjà réglés restent visibles. */
-html.js:not(.premium) .pday .pick:not(.free-ok):not(.free1):not(.done) :is(.ring, .pk-txt > b, .pk-fair),
-html.js:not(.premium):not(.signed) .pday .pick.free1:not(.free-ok):not(.done) :is(.ring, .pk-txt > b, .pk-fair),
-html.js:not(.premium) .pday .dcoupon:not(.done) :is(.dc-legs, .dc-odds) {
-  filter: blur(5px); opacity: .75; user-select: none; -webkit-user-select: none; pointer-events: none; }
-html.js:not(.premium) .pday .pick:not(.free1):not(.free-ok) .pk-add, html.js:not(.signed) .pday .pk-add,
-html.js:not(.premium) .pday .dc-load { display: none; }
+/* Gratuit : le n°1 de chaque liste avec un compte ; Premium : tout. Les paris déjà réglés restent visibles.
+   (Les cadenas viennent des formes vides .lkd, voir plus haut.) */
 html.signed .lock-anon, html:not(.signed) .lock-signed { display: none; }
 
 /* Nombre de paris dans le ticket, sur l'onglet */
@@ -962,7 +974,11 @@ html.signed .lock-anon, html:not(.signed) .lock-signed { display: none; }
 html:not(.premium) .tk-form, html:not(.premium) #tg-out, html:not(.premium) #ct-out { display: none; }
 html.js:not(.signed) .tk-an :is(.an-top, .an-grid, .wk-box, .same-box, .verdict),
 .tk-an.over :is(.an-top, .an-grid, .wk-box, .same-box, .verdict) {
-  filter: blur(5px); opacity: .75; user-select: none; -webkit-user-select: none; pointer-events: none; }
+  position: relative; user-select: none; -webkit-user-select: none; pointer-events: none;
+  color: transparent !important; border-color: transparent !important; box-shadow: none !important;
+  background: var(--lk-bg) var(--lk-ic) center / var(--lk-sz, 22px) no-repeat !important; border-radius: var(--lk-r, 12px); }
+html.js:not(.signed) .tk-an :is(.an-top, .an-grid, .wk-box, .same-box, .verdict) *,
+.tk-an.over :is(.an-top, .an-grid, .wk-box, .same-box, .verdict) * { visibility: hidden; }
 html.js:not(.signed) .tk-an #tk-share, .tk-an.over #tk-share { display: none; }
 .cmp-add { width: 100%; margin-top: 12px; }
 .cmp-add .ic-check { display: none; }
@@ -1001,4 +1017,80 @@ html.js:not(.premium) .app:not(.free-ok) .cmp-add { display: none; }
 @media (max-width: 380px) {
   .seg button { font-size: 12px; gap: 4px; }
   .seg button svg { display: none; }
+}
+
+/* ---------- Ordinateur : barre latérale, contenu large, listes sur deux colonnes ---------- */
+.tabbar .tb-brand, .tabbar .tb-site { display: none; }
+@media (min-width: 1024px) {
+  :root { --side: 248px; --gut: 40px; }
+  body { padding-left: var(--side); }
+  .app { max-width: 1120px; padding: 0 var(--gut) 56px; }
+  .scroll-x { margin: 0 calc(-1 * var(--gut)); padding: 0 var(--gut); scroll-padding: 0 var(--gut); }
+  .top { justify-content: flex-end; padding-top: 22px; }
+  .top .brand { display: none; }
+  .intro { padding-top: 0; }
+  .h1 { font-size: 34px; letter-spacing: -1px; }
+  .lead { max-width: 64ch; font-size: 14px; }
+
+  /* La barre d'onglets devient un menu fixe à gauche */
+  .tabbar { inset: 0 auto 0 0; transform: none; width: var(--side); height: auto; border-radius: 0; border: 0;
+    border-right: 1px solid var(--night-line); box-shadow: none; flex-direction: column; align-items: stretch;
+    justify-content: flex-start; gap: 4px; padding: 26px 16px 22px; }
+  .tabbar a, .tabbar a[aria-current="page"] { height: 48px; justify-content: flex-start; padding: 0 14px; gap: 12px;
+    border-radius: 14px; font-size: 14.5px; }
+  .tabbar a svg, .tabbar a[aria-current="page"] svg { width: 22px; height: 22px; }
+  .tabbar a:not([aria-current="page"]) .tl { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  .tabbar a[data-count]::before { top: 50%; right: 12px; transform: translateY(-50%); }
+  html.premium .tabbar a[data-tab="compte"]::after { top: 50%; right: 16px; margin-top: -4px; }
+  .tabbar .tb-brand { display: flex; height: auto; gap: 10px; padding: 0 8px; margin-bottom: 26px; color: #FFFFFF; background: none; }
+  .tabbar .tb-brand .mark { width: 34px; height: 34px; }
+  .tabbar .tb-brand .mark-bg { fill: #132A4C; }
+  .tabbar .wordmark { color: #FFFFFF; }
+  .tabbar .wordmark span { color: #4ADE80; }
+  .tabbar .tb-site { display: flex; margin-top: auto; height: 44px; font-size: 13.5px; font-weight: 700;
+    border: 1px solid var(--night-line); }
+  .tabbar .tb-site svg { width: 20px; height: 20px; }
+  @media (hover: hover) { .tabbar .tb-brand:hover { background: none; } }
+
+  .toast { left: calc(50% + var(--side) / 2); bottom: 32px; }
+  .sheet { inset: 0 0 0 var(--side); margin: auto; max-width: 560px; height: min(84vh, 760px); border-radius: 26px; }
+  .sheet .handle { display: none; }
+
+  /* Matchs : deux cartes par ligne (les paris attendent un écran plus large, plus bas) */
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+  .featured { padding: 22px 26px; }
+  /* Accueil : les championnats se rangent sur deux colonnes ; un seul championnat affiché → ses matchs deux par deux */
+  #list { columns: 2; column-gap: 24px; }
+  #list > * { break-inside: avoid; }
+  #list > .ad { column-span: all; margin-bottom: 4px; }
+  #list .cards { display: flex; flex-direction: column; align-items: stretch; }
+  #list:not(:has(> .lg:not([hidden]) ~ .lg:not([hidden]))) { columns: auto; }
+  #list:not(:has(> .lg:not([hidden]) ~ .lg:not([hidden]))) .cards { display: grid; }
+
+  /* Page d'un match : bandeau arrondi, analyses en deux colonnes */
+  .hero { margin: 4px 0 0; padding: 22px 28px 26px; border-radius: 30px; border-top: 1px solid var(--night-line); }
+  .panel { display: block; columns: 2; column-gap: 14px; }
+  .panel > * { break-inside: avoid; margin: 0 0 14px; }
+  .panel > .panel-head { column-span: all; }
+
+  /* Ticket : le coupon à gauche, son analyse à droite (elle reste visible pendant qu'on ajoute des matchs) */
+  .tk-panel[data-panel="mine"]:not([hidden]):has(> #tk-an:not([hidden])) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+    column-gap: 28px; align-items: start; }
+  .tk-panel[data-panel="mine"]:not([hidden]):has(> #tk-an:not([hidden])) > * { grid-column: 1; }
+  .tk-panel[data-panel="mine"]:not([hidden]):has(> #tk-an:not([hidden])) > #tk-an { grid-column: 2; grid-row: 1 / span 12; position: sticky; top: 20px; margin-top: 12px; }
+  .seg.modes { max-width: 560px; }
+
+  .foot { margin-top: 40px; }
+  /* Compte, Premium, textes légaux : une colonne de lecture confortable */
+  :is(.page-compte, .page-premium, .page-legal) main { max-width: 760px; }
+}
+/* Paris et coupons : deux par ligne seulement quand chaque carte garde la place d'un écran de téléphone */
+@media (min-width: 1200px) {
+  .picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+  .dcoupons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; align-items: start; }
+  .dcoupons > :not(.dcoupon) { grid-column: 1 / -1; }
+}
+@media (min-width: 1440px) {
+  :root { --side: 272px; --gut: 56px; }
+  .app { max-width: 1240px; }
 }

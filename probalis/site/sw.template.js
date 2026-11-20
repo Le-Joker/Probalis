@@ -4,7 +4,7 @@ const CORE = `probalis-core-${VERSION}`;
 const PAGES = 'probalis-pages';
 const CRESTS = 'probalis-crests';
 const PRECACHE = [`/assets/style.css?v=${VERSION}`, `/assets/app.js?v=${VERSION}`, '/manifest.webmanifest',
-  '/icons/icone-192.png', '/icons/probalis-icone.svg', '__FONTS__'];
+  '/icons/icone-192.png', '/icons/probalis-icone.svg', '/app/', '__FONTS__'];
 const SLOW_MS = 3500;   // au-delà, on montre la dernière version enregistrée et on met à jour en arrière-plan
 const MAX_PAGES = 40;
 const MAX_CRESTS = 600;
@@ -67,6 +67,9 @@ self.addEventListener('fetch', (e) => {
     }
     return;
   }
+
+  // Chiffres protégés : jamais enregistrés sur le téléphone, toujours demandés au serveur (qui vérifie le compte)
+  if (url.pathname.startsWith('/lk/')) return;
 
   if (req.mode === 'navigate' || req.destination === 'document' || req.headers.get('X-Probalis-Nav') ||
       url.pathname.endsWith('.html') || url.pathname.endsWith('/')) {

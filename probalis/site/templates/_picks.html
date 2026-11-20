@@ -5,20 +5,21 @@
 {% macro pick_card(e, first=false, hist=false) %}
 <div class="pick{% if first %} free1{% endif %}{% if e.res %} done res-{{ e.res }}{% endif %}{% if hist %} hist{% endif %}" data-ko="{{ e.match.kickoff }}">
   {% if e.match.slug and not e.res %}<a class="pk-main" href="{{ root }}match/{{ e.match.slug }}.html">{% else %}<span class="pk-main">{% endif %}
-    <span class="ring">
+    {% call lk(m=e.match.slug, free=first, on=not e.res) %}<span class="ring">
       <svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true"><circle class="trk" cx="27" cy="27" r="23" fill="none" stroke-width="6"/><circle class="val" cx="27" cy="27" r="23" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ e.dash }}" transform="rotate(-90 27 27)"/></svg>
       <b>{{ e.pct }}</b>
-    </span>
+    </span>{% endcall %}
     <span class="pk-txt">
-      <b>{{ e.label }}</b>
-      <small>{{ e.times }} · {{ e.market }}</small>
+      {% call lk(m=e.match.slug, free=first, on=not e.res, own=true) %}{% if lk.pub %}<b class="lkd" aria-hidden="true">{{ t.lk_label }}</b>
+      <small class="lkd" aria-hidden="true">{{ t.lk_times }}</small>{% else %}<b>{{ e.label }}</b>
+      <small>{{ e.times }} · {{ e.market }}</small>{% endif %}{% endcall %}
       <span class="pk-match">{{ crest(e.match.home_crest, 's16') }}{{ crest(e.match.away_crest, 's16') }}<span>{{ e.match.home }} – {{ e.match.away }} · <span data-dshort="{{ e.match.kickoff }}">{{ e.match.day_short }}</span> <time data-ko="{{ e.match.kickoff }}">{{ e.match.kickoff[11:16] }}</time></span></span>
     </span>
-    <span class="pk-fair"><small>{{ t.fair_odds }}</small><span class="pill">{{ e.fair }}</span></span>
+    {% call lk(m=e.match.slug, free=first, on=not e.res, own=true) %}{% if lk.pub %}<span class="pk-fair lkd" aria-hidden="true"><small>{{ t.fair_odds }}</small><span class="pill">0,00</span></span>{% else %}<span class="pk-fair"><small>{{ t.fair_odds }}</small><span class="pill">{{ e.fair }}</span></span>{% endif %}{% endcall %}
   {% if e.match.slug and not e.res %}</a>{% else %}</span>{% endif %}
   {% if e.res or hist %}{{ res_badge(e.res, e.match.score) }}{% else %}
   <span class="pk-started">{{ icon('clock', 12, 2.6) }}{{ t.started }}</span>
-  <button class="pk-add js-only" type="button" data-add='{{ e.add|tojson }}' aria-pressed="false" aria-label="{{ t.add_coupon }} : {{ e.label }}" title="{{ t.add_coupon }}">{{ icon('plus', 20, 2.6) }}{{ icon('check', 20, 2.6) }}</button>
+  {% call lk(m=e.match.slug, free=first, hide=true) %}<button class="pk-add js-only" type="button" data-add='{{ e.add|tojson }}' aria-pressed="false" aria-label="{{ t.add_coupon }} : {{ e.label }}" title="{{ t.add_coupon }}">{{ icon('plus', 20, 2.6) }}{{ icon('check', 20, 2.6) }}</button>{% endcall %}
   {% endif %}
 </div>
 {% endmacro %}
@@ -27,10 +28,10 @@
 <article class="dcoupon{% if cp.res %} done{% endif %}{% if hist %} hist{% endif %}">
   <div class="dc-head">
     <span class="dc-target">{{ icon('ticket', 16, 2.2) }}{{ cp.title }}</span>
-    <span class="dc-meta">{{ cp.meta }}</span>
+    {% call lk(on=not cp.res, own=true) %}{% if lk.pub %}<span class="dc-meta">{{ t.lk_coupon_meta.format(n=cp.n) }}</span>{% else %}<span class="dc-meta">{{ cp.meta }}</span>{% endif %}{% endcall %}
     {% if cp.res or hist %}{{ res_badge(cp.res) }}{% endif %}
   </div>
-  <ol class="dc-legs">
+  {% call lk(on=not cp.res) %}<ol class="dc-legs">
   {% for e in cp.legs %}
     <li data-ko="{{ e.match.kickoff }}">
       <span class="dc-l"><b>{{ e.label }}</b><small>{{ e.match.home }} – {{ e.match.away }}{% if e.match.score %} ({{ e.match.score[0] }}-{{ e.match.score[1] }}){% endif %} · <span data-dshort="{{ e.match.kickoff }}">{{ e.match.day_short }}</span> <time data-ko="{{ e.match.kickoff }}">{{ e.match.kickoff[11:16] }}</time></small></span>
@@ -38,10 +39,10 @@
       {% if e.res %}<span class="dc-r {{ e.res }}" title="{{ t['res_' ~ e.res] }}">{{ icon({'won': 'check', 'lost': 'x', 'void': 'equal'}[e.res], 13, 3) }}</span>{% endif %}
     </li>
   {% endfor %}
-  </ol>
+  </ol>{% endcall %}
   <div class="dc-foot">
-    <span class="dc-odds"><small>{{ t.coupon_book }}</small><b>≈ {{ cp.book }}</b><small>{{ cp.fair }} · {{ cp.times }}</small></span>
-    {% if not cp.res and not hist %}<button class="btn ghost dc-load js-only" type="button" data-legs='{{ cp.add|tojson }}'>{{ icon('plus', 18, 2.4) }}{{ t.coupon_load }}</button>{% endif %}
+    {% call lk(on=not cp.res) %}<span class="dc-odds"><small>{{ t.coupon_book }}</small><b>≈ {{ cp.book }}</b><small>{{ cp.fair }} · {{ cp.times }}</small></span>{% endcall %}
+    {% if not cp.res and not hist %}{% call lk(hide=true) %}<button class="btn ghost dc-load js-only" type="button" data-legs='{{ cp.add|tojson }}'>{{ icon('plus', 18, 2.4) }}{{ t.coupon_load }}</button>{% endcall %}{% endif %}
   </div>
 </article>
 {% endmacro %}

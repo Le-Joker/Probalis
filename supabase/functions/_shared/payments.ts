@@ -5,20 +5,21 @@ import prices from "./prices.json" with { type: "json" };
 import { claim, fmtDate, firstName, sendEmail, unclaim } from "./email.ts";
 import { hmacHex, rest, same, SITE_URL } from "./http.ts";
 
-type Currency = { provider: "stripe" | "flutterwave"; decimals: number; week: number; month: number; options?: string };
-export type Plan = "week" | "month";
+export type Plan = "week" | "month" | "quarter" | "half" | "year";
+type Currency = { provider: "stripe" | "flutterwave"; decimals: number; options?: string } & Record<Plan, number>;
 export type Offer = { plan: Plan; days: number; currency: string; amount: number; provider: Currency["provider"]; options?: string };
 
 const CURRENCIES = prices.currencies as Record<string, Currency>;
 const COUNTRIES = prices.countries as Record<string, string>;
+const PLANS = prices.plans as Record<string, { days: number }>;
 
 export function offer(plan: string, country: string, lang: "fr" | "en"): Offer | null {
-  if (plan !== "week" && plan !== "month") return null;
+  if (!Object.hasOwn(PLANS, plan)) return null;
   const code = COUNTRIES[country] ?? (prices.default_currency as Record<string, string>)[lang] ?? "EUR";
   const cur = CURRENCIES[code];
   if (!cur) return null;
-  const days = (prices.plans as Record<string, { days: number }>)[plan].days;
-  return { plan, days, currency: code, amount: cur[plan], provider: cur.provider, options: cur.options };
+  const p = plan as Plan;
+  return { plan: p, days: PLANS[p].days, currency: code, amount: cur[p], provider: cur.provider, options: cur.options };
 }
 
 const minor = (amount: number, currency: string) => Math.round(amount * 10 ** (CURRENCIES[currency]?.decimals ?? 2));
@@ -144,7 +145,10 @@ export async function flutterwaveConfirm(transactionId: string): Promise<{ payme
 }
 
 // ---------- Activation du Premium et reçu ----------
-const PLAN_LABEL = { fr: { week: "Pass 7 jours", month: "Pass 30 jours" }, en: { week: "7-day pass", month: "30-day pass" } };
+const PLAN_LABEL: Record<"fr" | "en", Record<Plan, string>> = {
+  fr: { week: "Pass 7 jours", month: "Pass 30 jours", quarter: "Pass 3 mois", half: "Pass 6 mois", year: "Pass 1 an" },
+  en: { week: "7-day pass", month: "30-day pass", quarter: "3-month pass", half: "6-month pass", year: "1-year pass" },
+};
 const PROVIDER_LABEL = {
   fr: { stripe: "Carte ou portefeuille (Stripe)", flutterwave: "Mobile money ou carte (Flutterwave)" },
   en: { stripe: "Card or wallet (Stripe)", flutterwave: "Mobile money or card (Flutterwave)" },

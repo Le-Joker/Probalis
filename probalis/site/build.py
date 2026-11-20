@@ -5,9 +5,11 @@ Usage : python -m probalis build      (récupère les données, calcule, génèr
 """
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import math
+import secrets
 import shutil
 import sys
 import time
@@ -15,9 +17,11 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from markupsafe import Markup, escape
 
 from ..football.leagues import BY_CODE, LEAGUES
-from . import config, history, i18n, picks
+from . import config, history, i18n, picks, qr, site_text
+from .lock import Locker
 from .icons import GOOGLE_G, icon, logo_mark
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -239,6 +243,20 @@ def _money(amount: float, cur: str, decimals: int, lang: str) -> str:
     return f"{n} {sym}" if lang == "fr" else f"{sym}{n}"
 
 
+def _save_pct(prices: dict, c: dict, plan: str) -> int:
+    """Remise par jour d'un pass, par rapport au pass 30 jours (0 si moins de 5 %)."""
+    days = prices["plans"]
+    n = round((1 - (c[plan] / days[plan]["days"]) / (c["month"] / days["month"]["days"])) * 100)
+    return n if n >= 5 else 0
+
+
+def _save_txt(prices: dict, c: dict, plan: str, lang: str) -> str:
+    n = _save_pct(prices, c, plan)
+    if not n:
+        return ""
+    return f"\u2212{n}\u00a0%" if lang == "fr" else f"\u2212{n}%"
+
+
 def _featured(views: list[dict]) -> tuple[list[dict], str | None]:
     """Candidats « à la une » : la plus belle affiche de chaque championnat, chaque jour.
 
@@ -364,6 +382,85 @@ def _ticket_data(matches: list[dict], lang: str, now: datetime) -> dict:
             "tiers": {k: list(v) for k, v in picks.TIERS.items()}, "matches": out}
 
 
+def _dump(path: Path, obj, gz: bool = False) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    raw = json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    if gz:
+        path.with_name(path.name + ".gz").write_bytes(gzip.compress(raw, compresslevel=9, mtime=0))
+    else:
+        path.write_bytes(raw)
+
+
+def full_data_file() -> Path:
+    """Copie des données complètes (toutes les probabilités) gardée sur l'ordinateur qui construit le site, jamais
+    publiée : elle sert aux e-mails du jour et aux captures de la vitrine."""
+    return ROOT / "data" / "cache" / "site-matches.json"
+
+
+def _lk_dir(cfg: dict) -> str:
+    """Nom du dossier des chiffres protégés, dans public/. En ligne (Supabase configuré) : un nom tiré au hasard à
+    chaque construction, que seul le gardien connaît. Cloudflare sert n'importe quel fichier du site à qui connaît
+    son adresse, et certaines façons d'écrire une adresse (//lk/…, /%6ck/…) arrivent aux fichiers sans passer par
+    le gardien : un nom impossible à deviner ferme cette porte. En mode démo (appli servie en local, sans
+    Supabase) : lk/, lu directement par l'appli."""
+    sb = cfg.get("sb") or {}
+    return "lk-" + secrets.token_hex(20) if sb.get("url") and sb.get("key") else "lk"
+
+
+def locked_dir(public: Path | None = None) -> Path:
+    """Dossier des chiffres protégés d'un site construit (pour les outils qui lisent les données complètes)."""
+    public = public or PUBLIC
+    found = [public / "lk"] if (public / "lk").is_dir() else sorted(public.glob("lk-*"))
+    return found[0] if found else public / "lk"
+
+
+def _write_locked(lk: Locker, tk: dict, version: str, data: dict, base: Path) -> None:
+    """Dans `base` (voir _lk_dir) : les vrais blocs de chaque page (Premium), ceux offerts à tout compte
+    (free.json), ceux de chaque match (analyse gratuite du jour) et les données du constructeur de coupons. Rien de
+    tout ça n'est envoyé sans vérification du compte par le gardien. En ligne, les fichiers sont compressés (.gz,
+    dix fois plus légers à envoyer sur Cloudflare) : le gardien les décompresse avant de répondre. Les données
+    complètes ne sont pas publiées (full_data_file), sauf en mode démo pour les captures."""
+    gz = base.name != "lk"
+    pages = [p for p in lk.pages if "/" in p and p.split("/", 1)[0] in i18n.LANGS]
+    for page in pages:
+        blocks = lk.all_of(page)
+        if blocks:
+            _dump(base / f"{page}.json", {"v": version, "b": blocks}, gz)
+    for lang in i18n.LANGS:
+        free = {p.split("/", 1)[1]: b for p, b in lk.free_of().items() if p.startswith(lang + "/")}
+        _dump(base / lang / "free.json", {"v": version, "p": free}, gz)
+        _dump(base / "data" / f"ticket-{lang}.json", tk[lang], gz)
+    by_slug = {lang: {m["s"]: m for m in tk[lang]["matches"]} for lang in i18n.LANGS}
+    per: dict[tuple[str, str], dict] = {}
+    for slug, by_page in lk.by_match().items():
+        for page, blocks in by_page.items():
+            lang, rest = page.split("/", 1)
+            if lang in i18n.LANGS:
+                per.setdefault((lang, slug), {})[rest] = blocks
+    for (lang, slug), p in per.items():
+        _dump(base / lang / "m" / f"{slug}.json", {"v": version, "p": p, "tk": by_slug[lang].get(slug)}, gz)
+    _dump(full_data_file(), data)
+    if not gz:
+        _dump(base / "data" / "matches.json", data)
+
+
+GUARD = HERE / "guard.js"
+
+
+def _write_guard(cfg: dict, lk_dir: str) -> None:
+    """Le gardien des adresses /lk/ (Cloudflare Pages Function), avec l'adresse et la clé publique de Supabase et le
+    nom du dossier protégé. Sans Supabase (mode démo), il refuse tout."""
+    sb = cfg.get("sb") or {}
+    js = GUARD.read_text(encoding="utf-8").replace("__LK_DIR__", lk_dir)
+    js = js.replace("__SB_URL__", json.dumps(sb.get("url") or "")[1:-1])
+    js = js.replace("__SB_KEY__", json.dumps(sb.get("key") or "")[1:-1])
+    dst = ROOT / "functions" / "lk" / "[[path]].js"
+    if dst.parent.exists():
+        shutil.rmtree(dst.parent)
+    dst.parent.mkdir(parents=True)
+    dst.write_text(js, encoding="utf-8")
+
+
 SIMULATION = HERE / "simulation.json"
 
 
@@ -396,10 +493,171 @@ def _clear(folder: Path, tries: int = 8) -> None:
         shutil.rmtree(folder, onexc=retry) if sys.version_info >= (3, 12) else shutil.rmtree(folder, onerror=retry)
 
 
+# --- Site vitrine (page d'accueil publique) ------------------------------------------------------------------
+
+SITE_PAGES = {"fr": "/", "en": "/welcome/"}   # l'appli reste dans /fr/ et /en/
+DEFAULT_SITE_URL = "https://probalis.pages.dev"
+
+
+def _shot_fn(lang: str):
+    """Balise <img> d'une capture de l'appli (deux tailles : le téléphone choisit la plus légère qui suffit)."""
+    def shot(name: str, alt: str, lazy: bool = True, cls: str = "", idx: int | None = None) -> Markup:
+        base = f"/assets/shots/{lang}-{name}"
+        attrs = [f'src="{base}-600.jpg"', f'srcset="{base}-360.jpg 360w, {base}-600.jpg 600w"',
+                 'sizes="(max-width: 699px) 64vw, 300px"', 'width="600" height="1298"', f'alt="{escape(alt)}"',
+                 'decoding="async"', 'loading="lazy"' if lazy else 'fetchpriority="high"']
+        if cls:
+            attrs.append(f'class="{cls}"')
+        if idx is not None:
+            attrs.append(f'data-i="{idx}"')
+        return Markup("<img " + " ".join(attrs) + ">")
+    return shot
+
+
+def _site_money(amount: float, cur: str, decimals: int, lang: str) -> str:
+    n = f"{amount:,.{decimals}f}"
+    if lang == "fr":
+        n = n.replace(",", "\u00a0").replace(".", ",")
+    label = site_text.CURRENCY_LABEL.get(cur, cur)
+    if lang == "fr":
+        return f"{n}\u00a0{label}"
+    return f"{label}\u00a0{n}" if label[-1].isalpha() else f"{label}{n}"
+
+
+def _site_prices(cfg: dict, lang: str) -> dict:
+    cur_cfg = cfg["prices"]["currencies"]
+    table, lst = {}, []
+    for code in site_text.CURRENCIES[lang]:
+        c = cur_cfg.get(code)
+        if not c:
+            continue
+        row = {"free": _site_money(0, code, 0, lang)}
+        for k in cfg["prices"]["plans"]:
+            row[k] = _site_money(c[k], code, c["decimals"], lang)
+            row[k + "_save"] = _save_txt(cfg["prices"], c, k, lang)
+        table[code] = row
+        lst.append({"code": code, "label": site_text.CURRENCY_LABEL.get(code, code)})
+    return {"list": lst, "table": table, "first": table[lst[0]["code"]], "plans": list(cfg["prices"]["plans"])}
+
+
+def _site_sim(sim: dict | None, lang: str) -> dict | None:
+    """Chiffres de la simulation 2025/26 pour le site : annoncé, réel, et gain ou perte à la cote du bookmaker."""
+    if not sim:
+        return None
+    t, s = i18n.UI[lang], site_text.SITE[lang]
+
+    def row(r: dict, key: str | None, name: str) -> dict:
+        return {"key": key, "name": name, "ann": r["announced"], "real": r["rate"],
+                "ann_txt": r["announced_txt"][lang], "real_txt": r["rate_txt"][lang],
+                "ann_int": round(r["announced"] * 100), "real_int": round(r["rate"] * 100),
+                "n_txt": r["n_txt"][lang], "roi": r["roi"], "roi_txt": r["roi_txt"][lang]}
+
+    tiers = [row(sim["tiers"][k], k, t["tier_" + k]) for k in picks.TIERS if k in sim["tiers"]]
+    coupons = [row(c, None, s["coupon_row"].format(n=c["target"])) for c in sim["coupons"]]
+    first = [row(c, None, s["proof_coupon"]) for c in sim["coupons"] if c["target"] == 2]
+    losses = sorted(abs(r["roi"]) for r in tiers)
+    return {"season": sim["season"], "n_txt": sim["matches_txt"][lang], "rows": tiers + first[:1],
+            "table": tiers + coupons, "lo": i18n.pct(losses[0], lang), "hi": i18n.pct(losses[-1], lang)}
+
+
+def _site_when(iso: str, lang: str) -> str:
+    dt = datetime.fromisoformat(iso).astimezone(timezone.utc)
+    return f"{i18n.day_med(dt.date(), lang)}, {dt.strftime('%H:%M')} UTC"
+
+
+def _site_carnet(hist: dict, today: str, lang: str, slugs: set) -> dict | None:
+    """La dernière liste figée (aujourd'hui en général) : le n° 1 de chaque niveau, comme pour un compte gratuit."""
+    days = hist.get("days", {})
+    frozen = sorted(d for d, e in days.items() if e.get("frozen") and d <= today)
+    if not frozen:
+        return None
+    day = frozen[-1]
+    e = days[day]
+    v = _day_view(day, e, lang, slugs)
+    t, s = i18n.UI[lang], site_text.SITE[lang]
+    rows = []
+    for tier in picks.TIERS:
+        lst = v["tiers"].get(tier) or []
+        if lst:
+            c = lst[0]
+            res = c["res"] or "wait"
+            # Pari pas encore réglé : réservé aux comptes (n° 1 de chaque liste), donc caché sur la vitrine
+            hide = res == "wait"
+            rows.append({"tier": tier, "tier_name": t["tier_" + tier], "locked": hide,
+                         "label": None if hide else c["label"],
+                         "match": f'{c["match"]["home"]} – {c["match"]["away"]}',
+                         "pct": None if hide else c["pct"], "times": None if hide else c["times"],
+                         "res": res, "res_txt": s["res_" + res]})
+    total = sum(len(lst) for lst in v["tiers"].values())
+    return {"day": i18n.day_med(date.fromisoformat(day), lang), "built": e.get("built", ""),
+            "when": _site_when(e["built"], lang) if e.get("built") else "", "rows": rows,
+            "more": total - len(rows), "coupons": len(v["coupons"])}
+
+
+def _site_record(hist: dict, lang: str) -> str | None:
+    days = hist.get("days", {})
+    frozen = sorted(d for d, e in days.items() if e.get("frozen"))
+    if not frozen:
+        return None
+    s = site_text.SITE[lang]
+    summ = history.summary(days)
+    since = i18n.day_med(date.fromisoformat(frozen[0]), lang)
+    tiers = list(summ["tiers"].values())
+    if any(r["n"] < 30 for r in tiers):
+        return s["carnet_record_early"].format(since=since)
+    return s["carnet_record"].format(since=since, won=sum(r["won"] for r in tiers), n=sum(r["n"] for r in tiers))
+
+
+def _site_odds(lang: str, o: float = 1.5) -> dict:
+    """État de départ du décodeur de cote (le même calcul est refait dans site.js quand on tape une cote)."""
+    s = site_text.SITE[lang]
+    b = 1 / o
+    n10 = max(1, min(9, round(b * 10)))
+    return {"value": i18n.odds(o, lang), "examples": [i18n.odds(x, lang) for x in (1.3, 1.5, 2.0, 3.0, 5.0)],
+            "big": s["odds_times10"].format(n=n10), "pct": s["odds_need_pct"].format(p=round(b * 100)),
+            "margin": s["odds_margin"].format(f=i18n.pct(b / (1 + picks.BOOK_MARGIN), lang).replace(" %", " %")),
+            "fills": [f"{max(0.0, min(1.0, b * 10 - i)):.2f}" for i in range(10)]}
+
+
+def _site_pages(env: Environment, hist: dict, today: str, slugs: set, sim: dict | None, cfg: dict, site: dict,
+                version: str, now: datetime) -> None:
+    """Le site vitrine : / en français, /welcome/ en anglais, et /app/ (point d'entrée de l'appli installée)."""
+    site_url = site["site_url"] or DEFAULT_SITE_URL
+    code = qr.svg(site_url + "/", label="QR")
+    for lang in i18n.LANGS:
+        s, other = site_text.SITE[lang], ("en" if lang == "fr" else "fr")
+        here = SITE_PAGES[lang]
+        out = PUBLIC / "index.html" if here == "/" else PUBLIC / here.strip("/") / "index.html"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        groups = [{"title": i18n.UI[lang]["sec_" + key],
+                   "leagues": [{"name": lg.name_fr if lang == "fr" else lg.name_en,
+                                "country": lg.country_fr if lang == "fr" else lg.country_en} for lg in lgs]}
+                  for key, lgs in league_sections() if lgs]
+        ld = {"@context": "https://schema.org", "@type": "WebApplication", "name": "Probalis", "url": site_url + here,
+              "applicationCategory": "SportsApplication", "operatingSystem": "Android, iOS, Windows, macOS",
+              "inLanguage": lang, "description": s["description"],
+              "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}}
+        js = {"lang": lang, "margin": picks.BOOK_MARGIN, "app": f"/{lang}/",
+              **{k: s[k] for k in ("odds_times10", "odds_times100", "odds_need_pct", "odds_margin", "odds_error",
+                                   "inst_copied")}}
+        page = env.get_template("site.html").render(
+            lang=lang, s=s, t=i18n.UI[lang], version=version, site_url=site_url, here=here, other=other,
+            other_url=SITE_PAGES[other], app=f"/{lang}/", sim=_site_sim(sim, lang),
+            carnet=_site_carnet(hist, today, lang, slugs), record=_site_record(hist, lang), groups=groups,
+            prices=_site_prices(cfg, lang), odds=_site_odds(lang),
+            qr=Markup(code.replace('aria-label="QR"', f'aria-label="{escape(s["qr_label"])}"')),
+            contact=site.get("contact_email"), year=now.year, ld=ld, js=js, shot=_shot_fn(lang))
+        out.write_text(page, encoding="utf-8")
+    app_dir = PUBLIC / "app"
+    app_dir.mkdir(exist_ok=True)
+    (app_dir / "index.html").write_text(env.get_template("launch.html").render(), encoding="utf-8")
+
+
 def build(data: dict) -> Path:
     env = Environment(loader=FileSystemLoader(HERE / "templates"), autoescape=select_autoescape(["html"]),
                       trim_blocks=True, lstrip_blocks=True)
-    env.globals.update(icon=icon, logo_mark=logo_mark, google_g=GOOGLE_G)
+    lk = Locker()
+    env.globals.update(icon=icon, logo_mark=logo_mark, google_g=GOOGLE_G, lk=lk)
     _clear(PUBLIC)
     shutil.copytree(HERE / "static", PUBLIC / "assets")
     icons = PUBLIC / "icons"
@@ -446,50 +704,58 @@ def build(data: dict) -> Path:
                     groups.append({**lv, "matches": [v for v in views if v["league"] == lv["code"]]})
 
         featured, lead = _featured(views)
+        lk.start(f"{lang}/index")
         (out / "index.html").write_text(env.get_template("matches.html").render(
             **common, page="matches", root="", path="index.html", groups=groups, chips=chips, sheet=sheet,
             featured=featured, lead=lead, n_matches=len(views)), encoding="utf-8")
+        lk.start(f"{lang}/paris")
         (out / "paris.html").write_text(env.get_template("bets.html").render(
             **common, page="bets", root="", path="paris.html", days=_paris_days(hist, today, lang, slugs),
             today=today, tiers=list(picks.TIERS)), encoding="utf-8")
+        lk.start(f"{lang}/ticket")
         (out / "ticket.html").write_text(env.get_template("ticket.html").render(
             **common, page="ticket", root="", path="ticket.html", tiers=list(picks.TIERS)), encoding="utf-8")
+        lk.start(f"{lang}/historique")
         (out / "historique.html").write_text(env.get_template("history.html").render(
             **common, page="historique", root="", path="historique.html",
             h=_history_view(hist, today, lang, slugs), sim=sim, tiers=list(picks.TIERS)), encoding="utf-8")
         # Compte, offres Premium, pages légales
+        lk.start(f"{lang}/compte")
         (out / "compte.html").write_text(env.get_template("account.html").render(
             **common, page="compte", root="", path="compte.html", sheet=sheet), encoding="utf-8")
         cur = cfg["prices"]["default_currency"][lang]
         cp = cfg["prices"]["currencies"][cur]
+        lk.start(f"{lang}/premium")
         (out / "premium.html").write_text(env.get_template("premium.html").render(
             **common, page="premium", root="", path="premium.html",
-            price_week=_money(cp["week"], cur, cp["decimals"], lang),
-            price_month=_money(cp["month"], cur, cp["decimals"], lang)), encoding="utf-8")
+            plans=[{"key": k, "price": _money(cp[k], cur, cp["decimals"], lang),
+                    "save": _save_txt(cfg["prices"], cp, k, lang)} for k in cfg["prices"]["plans"]]), encoding="utf-8")
         for doc, key in LEGAL_PAGES:
+            lk.start(f"{lang}/{doc}")
             (out / f"{doc}.html").write_text(env.get_template("legal.html").render(
                 **common, page="legal", root="", path=f"{doc}.html", doc=doc, title=t[key]), encoding="utf-8")
         for v in views:
+            lk.start(f"{lang}/match/{v['slug']}")
             (out / "match" / f"{v['slug']}.html").write_text(env.get_template("match.html").render(
                 **common, page="matches", m=v, root="../", path=f"match/{v['slug']}.html"), encoding="utf-8")
 
-    (PUBLIC / "index.html").write_text(env.get_template("root.html").render(version=version), encoding="utf-8")
+    lk.start("site")
+    _site_pages(env, hist, today, slugs, sim, cfg, site, version, now)
     fonts = sorted(f"/assets/fonts/{f.name}" for f in (HERE / "static" / "fonts").glob("*.woff2"))
     (PUBLIC / "sw.js").write_text((HERE / "sw.template.js").read_text(encoding="utf-8")
                                   .replace("__VERSION__", version).replace("'__FONTS__'", json.dumps(fonts)[1:-1]),
                                   encoding="utf-8")
     (PUBLIC / "manifest.webmanifest").write_text(json.dumps({
         "name": "Probalis", "short_name": "Probalis", "description": "La science du pari · The science of betting",
-        "start_url": "/", "scope": "/", "display": "standalone", "background_color": "#F3F5F8", "theme_color": "#F3F5F8",
+        "id": "/", "start_url": "/app/", "scope": "/", "display": "standalone", "background_color": "#F3F5F8", "theme_color": "#F3F5F8",
         "icons": [{"src": "/icons/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
                   {"src": "/icons/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
                   {"src": "/icons/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
     }, ensure_ascii=False, indent=2), encoding="utf-8")
-    data_dir = PUBLIC / "data"
-    data_dir.mkdir(exist_ok=True)
-    (data_dir / "matches.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    for lang in i18n.LANGS:
-        (data_dir / f"ticket-{lang}.json").write_text(json.dumps(
-            _ticket_data(data["matches"], lang, now), ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    history.save(hist, data_dir, now)
+    # Données complètes (probabilités) : seulement dans le dossier protégé, envoyé après vérification du compte
+    tk = {lang: _ticket_data(data["matches"], lang, now) for lang in i18n.LANGS}
+    lk_dir = _lk_dir(cfg)
+    _write_locked(lk, tk, version, data, PUBLIC / lk_dir)
+    _write_guard(cfg, lk_dir)
+    history.save(hist, PUBLIC / "data", now)
     return PUBLIC

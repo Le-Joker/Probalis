@@ -39,7 +39,7 @@
   {{ bar3(f) }}
   {{ pcts(f, (f.home.name, t.draw, f.away.name)) }}
   <div class="f-foot">
-    <span class="f-chips"><span>{{ t.over25_short }} {{ f.over25 }}</span><span>{{ t.btts_short }} {{ f.btts_yes }}</span></span>
+    {% call lk(m=f.slug, own=true) %}{% if lk.pub %}<span class="f-chips lkd" aria-hidden="true"><span>{{ t.over25_short }} 00 %</span><span>{{ t.btts_short }} 00 %</span></span>{% else %}<span class="f-chips"><span>{{ t.over25_short }} {{ f.over25 }}</span><span>{{ t.btts_short }} {{ f.btts_yes }}</span></span>{% endif %}{% endcall %}
     <span class="go" aria-hidden="true">{{ icon('arrow-right', 18, 2.4) }}</span>
   </div>
 </a>

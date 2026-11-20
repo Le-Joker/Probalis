@@ -9,7 +9,9 @@ personne ne reçoit deux fois le même e-mail, même si la tâche est relancée.
 
 Variables (secrets GitHub) : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, EMAIL_FROM,
 UNSUBSCRIBE_SECRET, PROBALIS_SITE_URL. Optionnelles : EMAIL_DAILY_CAP (90 par défaut, l'offre gratuite de
-Resend permet 100 e-mails par jour), BIG_MATCH_MIN (3.0), PROBALIS_DATA (fichier ou adresse de matches.json),
+Resend permet 100 e-mails par jour), BIG_MATCH_MIN (3.0), PROBALIS_DATA (fichier ou adresse de matches.json ;
+par défaut data/cache/site-matches.json, écrit par la construction du site : ces données complètes ne sont plus
+publiques en ligne, /lk/ demande un compte Premium),
 PROBALIS_CONTACT_EMAIL (adresse de réponse).
 Sans ces secrets, la tâche s'arrête proprement sans rien envoyer.
 """
@@ -84,7 +86,10 @@ def _z(d: datetime) -> str:
 # --- Matchs ---------------------------------------------------------------------------------------------------
 
 def local_data() -> dict | None:
-    f = ROOT / "public" / "data" / "matches.json"
+    from ..build import full_data_file, locked_dir
+    f = full_data_file()
+    if not f.exists():
+        f = locked_dir(ROOT / "public") / "data" / "matches.json"   # site construit en mode démo
     try:
         return json.loads(f.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -95,7 +100,7 @@ def load_data(site: str) -> dict | None:
     src = os.environ.get("PROBALIS_DATA", "").strip()
     if src and not src.startswith("http"):
         return json.loads(open(src, encoding="utf-8").read())
-    url = src or (f"{site}/data/matches.json" if site else "")
+    url = src  # en ligne, les données complètes sont protégées : seulement une adresse donnée exprès
     if url:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA})

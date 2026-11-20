@@ -7,7 +7,7 @@
 </div>
 
 <noscript><p class="empty">{{ t.mine_empty }}</p></noscript>
-<div class="tk js-only" id="tk" data-src="/data/ticket-{{ lang }}.json">
+<div class="tk js-only" id="tk" data-src="/lk/data/ticket-{{ lang }}.json">
   <div class="seg modes" id="tk-modes" role="group" aria-label="{{ t.mode_label }}">
     <button type="button" data-mode="mine" aria-pressed="true">{{ icon('pen', 16, 2.4) }}<span>{{ t.mode_mine }}</span></button>
     <button type="button" data-mode="target" aria-pressed="false">{{ icon('target', 16, 2.4) }}<span>{{ t.mode_target }}</span></button>
@@ -24,6 +24,7 @@
       <button class="btn ghost" type="button" id="tk-clear" hidden>{{ icon('trash', 18, 2.2) }}{{ t.clear_all }}</button>
     </div>
     <div class="card tk-picker" id="tk-picker" hidden>
+      <p class="note" id="tk-limit" hidden></p>
       <label class="field">{{ t.pick_day }}<select id="tk-day"></select></label>
       <label class="field">{{ t.pick_match }}<select id="tk-match"></select></label>
       <label class="field">{{ t.pick_bet }}<select id="tk-bet"></select></label>
@@ -36,7 +37,7 @@
       <p class="list-lock" id="tk-lock-more" hidden>{{ icon('lock', 16, 2.4) }}<span>{{ t.mine_lock_free }}</span><a href="{{ root }}premium.html">{{ t.lock_cta }}</a></p>
       <div class="an-top">
         <span id="tk-ring"></span>
-        <span class="an-main"><small>{{ t.ticket_h1 }} · <span id="tk-count"></span></small><b id="tk-times"></b><span>{{ t.pct_explain }}</span></span>
+        <span class="an-main"><small>{{ t.ticket_h1 }} · <span id="tk-count"></span></small><b id="tk-times"></b><span id="tk-explain">{{ t.pct_explain }}</span></span>
       </div>
       <div class="an-grid">
         <div><small>{{ t.fair_odds }}</small><b id="tk-fair"></b></div>
