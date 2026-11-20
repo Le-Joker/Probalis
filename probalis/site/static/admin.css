@@ -5,7 +5,8 @@
 .office-tag { align-self: center; margin-left: 2px; padding: 3px 8px; border-radius: 8px; background: var(--gold-bg);
   color: var(--gold-ink); font-family: var(--font-num); font-size: 12px; font-weight: 700; letter-spacing: .2px; }
 .page-office .brand { min-width: 0; }
-.page-office .wordmark span { color: inherit; }
+/* (plus fort que la règle du mode sombre de style.css, qui met « lis » en vert) */
+:root body.page-office .wordmark span { color: inherit; }
 .office-gate .office-ic { display: block; margin: 4px auto 0; border-radius: 18px; box-shadow: 0 10px 24px rgba(11, 31, 58, .22); }
 .office-gate h2 { font-size: 20px; }
 .office-gate .gbtn { margin-top: 18px; }
