@@ -4,14 +4,15 @@
 import prices from "./prices.json" with { type: "json" };
 import { claim, fmtDate, firstName, sendEmail, unclaim } from "./email.ts";
 import { hmacHex, rest, same, SITE_URL } from "./http.ts";
+import { notifyRewards } from "./notify.ts";
 
 export type Plan = "week" | "month" | "quarter" | "half" | "year";
 type Currency = { provider: "stripe" | "flutterwave"; decimals: number; options?: string } & Record<Plan, number>;
 export type Offer = { plan: Plan; days: number; currency: string; amount: number; provider: Currency["provider"]; options?: string };
 
-const CURRENCIES = prices.currencies as Record<string, Currency>;
+export const CURRENCIES = prices.currencies as Record<string, Currency>;
 const COUNTRIES = prices.countries as Record<string, string>;
-const PLANS = prices.plans as Record<string, { days: number }>;
+export const PLANS = prices.plans as Record<string, { days: number }>;
 
 export function offer(plan: string, country: string, lang: "fr" | "en"): Offer | null {
   if (!Object.hasOwn(PLANS, plan)) return null;
@@ -27,7 +28,7 @@ const minor = (amount: number, currency: string) => Math.round(amount * 10 ** (C
 export type Payment = {
   id: string;
   user_id: string | null;
-  provider: "stripe" | "flutterwave";
+  provider: "stripe" | "flutterwave" | "manual";
   plan: Plan;
   days: number;
   currency: string;
@@ -145,13 +146,13 @@ export async function flutterwaveConfirm(transactionId: string): Promise<{ payme
 }
 
 // ---------- Activation du Premium et reçu ----------
-const PLAN_LABEL: Record<"fr" | "en", Record<Plan, string>> = {
+export const PLAN_LABEL: Record<"fr" | "en", Record<Plan, string>> = {
   fr: { week: "Pass 7 jours", month: "Pass 30 jours", quarter: "Pass 3 mois", half: "Pass 6 mois", year: "Pass 1 an" },
   en: { week: "7-day pass", month: "30-day pass", quarter: "3-month pass", half: "6-month pass", year: "1-year pass" },
 };
 const PROVIDER_LABEL = {
-  fr: { stripe: "Carte ou portefeuille (Stripe)", flutterwave: "Mobile money ou carte (Flutterwave)" },
-  en: { stripe: "Card or wallet (Stripe)", flutterwave: "Mobile money or card (Flutterwave)" },
+  fr: { stripe: "Carte ou portefeuille (Stripe)", flutterwave: "Mobile money ou carte (Flutterwave)", manual: "Paiement direct (WhatsApp)" },
+  en: { stripe: "Card or wallet (Stripe)", flutterwave: "Mobile money or card (Flutterwave)", manual: "Direct payment (WhatsApp)" },
 };
 
 export const planLabel = (plan: Plan, lang: "fr" | "en") => `Probalis Premium · ${PLAN_LABEL[lang][plan]}`;
@@ -169,11 +170,13 @@ export function money(amount: number, currency: string, lang: "fr" | "en"): stri
 
 /** Active le Premium (une seule fois par paiement) puis envoie le reçu. */
 export async function finalize(paymentId: string, ref: string): Promise<{ premium_until: string | null } | null> {
-  const rows = await rest<{ user_id: string | null; premium_until: string | null; newly_paid: boolean }[]>(
+  const rows = await rest<{ user_id: string | null; premium_until: string | null; newly_paid: boolean; reward_id: string | null }[]>(
     "POST", "rpc/grant_premium", { p_payment: paymentId, p_ref: ref });
   const g = rows?.[0];
   if (!g) return null;
   if (g.newly_paid && g.user_id) await sendReceipt(paymentId).catch((e) => console.error("reçu", e));
+  // Le parrain de l'acheteur reçoit ses analyses offertes (e-mail + notification)
+  if (g.reward_id) await notifyRewards([g.reward_id]).catch((e) => console.error("récompense", e));
   return { premium_until: g.premium_until };
 }
 

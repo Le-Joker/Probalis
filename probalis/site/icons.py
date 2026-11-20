@@ -44,6 +44,10 @@ PATHS = {
     "wifi-off": '<path d="M3 3l18 18"/><path d="M8.5 16.5a5 5 0 0 1 7 0M5 12.5a10 10 0 0 1 4-2.4M19 12.5a10 10 0 0 0-2.3-1.7'
                 'M2 8.8a14.5 14.5 0 0 1 4.2-2.6M22 8.8a14.6 14.6 0 0 0-10-3.8"/><path d="M12 20h.01"/>',
     "signal": '<path d="M5 19v-3M10 19v-6M15 19V9M20 19V5"/>',
+    "users": '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 19.5c.8-3.3 3.4-5 6.5-5s5.7 1.7 6.5 5"/><path d="M15.5 4.8a3.5 3.5 0 0 1 0 6.4M17.5 14.7c2 .6 3.4 2.2 4 4.8"/>',
+    "chat": '<path d="M3.5 20.5 4.9 16A8.5 8.5 0 1 1 8.2 19.2Z"/><path d="M9.2 8.6c-.4 0-.8.4-.8 1 0 2.6 2.9 5.4 5.6 5.4.6 0 1-.4 1-.9v-.8l-1.7-.8-.9.8c-1-.4-2.3-1.6-2.7-2.7l.8-.9-.7-1.6Z"/>',
+    "dots": '<circle cx="12" cy="5" r=".9"/><circle cx="12" cy="12" r=".9"/><circle cx="12" cy="19" r=".9"/>',
+    "refresh": '<path d="M20 11.5A8 8 0 0 0 6.3 6.3L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M4 12.5a8 8 0 0 0 13.7 5.2l2.3-2.2"/><path d="M20 20v-4.5h-4.5"/>',
     "card": '<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h4"/>',
     "phone": '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
     "zap": '<path d="M13 2.5 4.5 13.5H12L11 21.5l8.5-11H12Z"/>',
@@ -76,12 +80,12 @@ def icon(name: str, size: int = 20, stroke: float = 2, cls: str = "") -> Markup:
                   f'aria-hidden="true" focusable="false">{PATHS[name]}</svg>')
 
 
-def logo_mark(size: int = 36) -> Markup:
-    """Le symbole Probalis : carré bleu nuit, jauge verte."""
+def logo_mark(size: int = 36, accent: str = "#22C55E") -> Markup:
+    """Le symbole Probalis : carré bleu nuit, jauge verte (dorée pour Probalis Office)."""
     return Markup(f'<svg class="mark" width="{size}" height="{size}" viewBox="0 0 120 120" aria-hidden="true" focusable="false">'
                   '<rect class="mark-bg" width="120" height="120" rx="30"/>'
                   '<path d="M37.5 26 H59.5 A24 24 0 0 1 59.5 74 H37.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.18" '
                   'stroke-width="12" stroke-linecap="round"/>'
-                  '<path d="M37.5 26 H59.5 A24 24 0 0 1 59.5 74 H37.5" fill="none" stroke="#22C55E" stroke-width="12" '
+                  f'<path d="M37.5 26 H59.5 A24 24 0 0 1 59.5 74 H37.5" fill="none" stroke="{accent}" stroke-width="12" '
                   'stroke-linecap="round" stroke-dasharray="83.6 200"/>'
                   '<rect x="30.5" y="20" width="14" height="80" rx="7" fill="#FFFFFF"/></svg>')

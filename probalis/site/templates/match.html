@@ -50,9 +50,15 @@
     <span class="fc-ic">{{ icon('lock', 20, 2.2) }}</span>
     <h2>{{ t.free_used_title }}</h2>
     <p>{{ t.free_used_text }} <a data-free-link href="#"></a>. {{ t.free_next }}</p>
-    <a class="btn" href="{{ root }}premium.html">{{ icon('crown', 18, 2.2) }}{{ t.lock_cta }}</a>
+    {# Analyses offertes (parrainage, cadeau) : ouvrent ce match tout de suite #}
+    <div class="fc-bonus">
+      <button class="btn" type="button" id="bonus-use">{{ icon('gift', 18, 2.2) }}{{ t.bonus_use }}</button>
+      <small class="fc-left" data-bonus-left></small>
+    </div>
+    <a class="btn fc-prem" href="{{ root }}premium.html">{{ icon('crown', 18, 2.2) }}{{ t.lock_cta }}</a>
   </div>
   <p class="fc fc-this">{{ icon('check', 16, 2.6) }}<span>{{ t.free_this }}</span></p>
+  <p class="fc fc-extra">{{ icon('gift', 16, 2.4) }}<span>{{ t.free_extra }}</span></p>
 </section>
 
 <div class="tabs-anchor" id="tabs-anchor"></div>

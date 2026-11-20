@@ -2,6 +2,7 @@
 {% from "_card.html" import league_logo %}
 {% block title %}{{ t.account_title }} · Probalis{% endblock %}
 {% block content %}
+{% include "_acct_tabs.html" %}
 <div class="intro">
   <div class="kicker">Probalis</div>
   <h1 class="h1">{{ t.account_title }}</h1>
@@ -39,7 +40,7 @@
       <div class="p-txt"><b id="acct-name"></b><small id="acct-email"></small></div>
     </section>
 
-    <section class="card plan" aria-labelledby="plan-title">
+    <section class="card my-plan" aria-labelledby="plan-title">
       <div class="card-head"><h2 id="plan-title">{{ t.plan_title }}</h2><span class="plan-badge" id="plan-badge"></span></div>
       <p class="note" id="plan-text" data-free="{{ t.free_plan_text }}">{{ t.free_plan_text }}</p>
       <a class="btn" id="plan-cta" href="{{ root }}premium.html" data-go="{{ t.go_premium }}" data-extend="{{ t.extend }}">{{ icon('crown', 18, 2.2) }}<span>{{ t.go_premium }}</span></a>
@@ -53,6 +54,15 @@
       <label class="switch-row"><span><b>{{ t.email_news }}</b><small>{{ t.email_news_help }}</small></span><input type="checkbox" class="switch" data-pref="email_news"></label>
       <label class="switch-row"><span><b>{{ t.email_reminders }}</b><small>{{ t.email_reminders_help }}</small></span><input type="checkbox" class="switch" data-pref="email_reminders"></label>
       <p class="note">{{ t.email_note }}</p>
+    </section>
+
+    <section class="card push-card" id="push-card" data-state="" aria-labelledby="push-title">
+      <h2 id="push-title">{{ icon('bell', 18, 2.2) }}{{ t.push_title }}</h2>
+      <label class="switch-row push-dev"><span><b>{{ t.push_device }}</b><small>{{ t.push_device_help }}</small></span><input type="checkbox" class="switch" id="push-device"></label>
+      <label class="switch-row push-daily"><span><b>{{ t.push_daily }}</b><small>{{ t.push_daily_help }}</small></span><input type="checkbox" class="switch" data-pref="push_daily"></label>
+      <p class="note push-msg" data-msg="ios">{{ t.push_ios }}</p>
+      <p class="note push-msg" data-msg="unsupported">{{ t.push_unsupported }}</p>
+      <p class="note push-msg" data-msg="blocked">{{ t.push_blocked }}</p>
     </section>
 
     <section class="card" aria-labelledby="pref-title">
@@ -74,6 +84,8 @@
       <p class="note">{{ t.responsible_text }}</p>
       <a class="more" href="{{ root }}jeu-responsable.html">{{ t.responsible_link }}{{ icon('chev-right', 16, 2.4) }}</a>
     </section>
+
+    <a class="card admin-link" id="admin-link" href="/office/" hidden>{{ icon('shield', 20, 2.2) }}<span>{{ t.admin_link }}</span>{{ icon('chev-right', 18, 2.4) }}</a>
 
     <div class="acct-actions">
       <button class="btn ghost" id="signout" type="button">{{ icon('logout', 18, 2.2) }}{{ t.signout }}</button>

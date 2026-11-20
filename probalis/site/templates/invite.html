@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ t.invp_title }} · Probalis{% endblock %}
+{% block description %}{{ t.invp_gift.format(n=ref.welcome) }}. {{ t.invp_lead }}{% endblock %}
+{% block og_image %}/og/invite-{{ lang }}.png{% endblock %}
+{% block content %}
+<section class="invp" id="invp" data-state="" aria-labelledby="invp-title">
+  <span class="f-ring" aria-hidden="true"></span>
+  <span class="soon-ic">{{ icon('users', 28, 2) }}</span>
+  <div class="kicker">{{ t.invp_kicker }}</div>
+  <h1 class="h1" id="invp-title">{{ t.invp_title }}</h1>
+  <p class="lead">{{ t.invp_lead }}</p>
+  <div class="invp-gift">
+    <span class="ig-n num" aria-hidden="true">+{{ ref.welcome }}</span>
+    <div><b>{{ t.invp_gift.format(n=ref.welcome) }}</b><small>{{ t.invp_gift_help }}</small></div>
+  </div>
+  <ul class="invp-perks">
+  {% for f in t.invp_perks %}
+    <li>{{ icon('check', 16, 2.6) }}{{ f }}</li>
+  {% endfor %}
+  </ul>
+  <a class="btn invp-go" id="invp-go" href="{{ root }}compte.html">{{ icon('user', 18, 2.2) }}{{ t.invp_cta }}</a>
+  <div class="invp-have" data-when="have">
+    <p class="note">{{ t.invp_have }}</p>
+    <a class="btn ghost" href="{{ root }}recompenses.html">{{ icon('gift', 18, 2.2) }}{{ t.invp_have_btn }}</a>
+  </div>
+  <p class="note invp-bad" data-when="bad">{{ t.invp_bad }}</p>
+  <span class="hchip">{{ icon('shield', 14, 2.2) }}{{ t.adult_only }}</span>
+</section>
+{% endblock %}

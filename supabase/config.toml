@@ -18,3 +18,14 @@ verify_jwt = false
 
 [functions.unsubscribe]
 verify_jwt = false
+
+# Récompenses, parrainage, notifications (jeton de connexion vérifié par la fonction) et admin (ADMIN_EMAILS)
+[functions.member]
+verify_jwt = false
+
+[functions.admin]
+verify_jwt = false
+
+# Tâche du jour (GitHub Actions) : la fonction vérifie elle-même la clé secrète du projet
+[functions.notify]
+verify_jwt = false

@@ -10,4 +10,4 @@ public/
 .env.*
 supabase/.temp/
 .wrangler/
-functions/
+/functions/

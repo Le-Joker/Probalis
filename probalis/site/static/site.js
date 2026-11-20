@@ -236,7 +236,7 @@
     });
   })();
 
-  // ---------- Hors connexion et installable ----------
+  // ---------- Installable (sans Internet, le service worker affiche l'écran « Pas de connexion ») ----------
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     win.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
   }

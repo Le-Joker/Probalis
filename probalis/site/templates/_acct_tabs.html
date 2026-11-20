@@ -1,0 +1,5 @@
+{# Onglets « Mon compte » / « Récompenses » (en haut des deux pages) #}
+<nav class="acct-tabs" aria-label="{{ t.tab_account }}">
+  <a href="{{ root }}compte.html"{% if path == 'compte.html' %} aria-current="page"{% endif %}>{{ icon('user', 17, 2.2) }}<span>{{ t.tab_account_short }}</span></a>
+  <a href="{{ root }}recompenses.html"{% if path == 'recompenses.html' %} aria-current="page"{% endif %}>{{ icon('gift', 17, 2.2) }}<span>{{ t.tab_rewards }}</span><b class="tab-badge num" data-rw-badge hidden></b></a>
+</nav>

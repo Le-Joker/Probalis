@@ -1,5 +1,5 @@
 // E-mail de bienvenue, envoyé une seule fois, juste après la première connexion Google.
-import { firstName, sendEmail } from "../_shared/email.ts";
+import { emailConfigured, firstName, sendEmail } from "../_shared/email.ts";
 import { getUser, json, lang, preflight, readJson, rest } from "../_shared/http.ts";
 
 Deno.serve(async (req) => {
@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     const email = p.email ?? user.email;
     if (!email) return json({ ok: true, sent: false });
     const sent = await sendEmail("welcome", l, email, { name: firstName(p.name, email) }, `welcome-${user.id}`);
-    const configured = !!(Deno.env.get("RESEND_API_KEY") && Deno.env.get("EMAIL_FROM"));
+    const configured = emailConfigured();
     if (!sent && configured) await rest("PATCH", `profiles?id=eq.${user.id}`, { welcome_sent_at: null }); // on réessaiera
     return json({ ok: true, sent });
   } catch (e) {

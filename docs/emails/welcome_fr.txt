@@ -7,7 +7,9 @@ Pour bien démarrer :
 • Utilise « Compare ta cote » : entre la cote de ton bookmaker, on te dit si c'est un bon prix.
 • Active les alertes des grands chocs dans Mon compte (../../public/fr/compte.html) : un e-mail la veille des plus belles affiches.
 
-Envie d'aller plus loin ? Premium (../../public/fr/premium.html) débloque l'analyse de tous les matchs, sans pub, avec un pass de 7 ou 30 jours, sans abonnement.
+Invite tes amis avec ton lien : chaque ami inscrit te rapporte des analyses offertes, à utiliser sur les matchs de ton choix. Tu le trouves dans Récompenses (../../public/fr/recompenses.html).
+
+Envie d'aller plus loin ? Premium (../../public/fr/premium.html) débloque l'analyse de tous les matchs, sans pub, avec un pass de 7 jours à 1 an, sans abonnement.
 
 Voir les matchs du jour : ../../public/fr/
 

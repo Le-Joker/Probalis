@@ -7,7 +7,9 @@ Getting started:
 • Use "Check your odds": enter your bookmaker's price and we tell you if it's a good one.
 • Turn on big-match alerts in My account (../../public/en/compte.html): an email the day before the biggest matches.
 
-Want more? Premium (../../public/en/premium.html) unlocks the analysis of every match, ad-free, with a 7- or 30-day pass and no subscription.
+Invite your friends with your link: every friend who signs up earns you free analyses to use on the matches you choose. You'll find it in Rewards (../../public/en/recompenses.html).
+
+Want more? Premium (../../public/en/premium.html) unlocks the analysis of every match, ad-free, with a pass from 7 days to 1 year and no subscription.
 
 See today's matches: ../../public/en/
 

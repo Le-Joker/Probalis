@@ -619,6 +619,28 @@ def _site_odds(lang: str, o: float = 1.5) -> dict:
             "fills": [f"{max(0.0, min(1.0, b * 10 - i)):.2f}" for i in range(10)]}
 
 
+def _office(env, lk, common: dict, cfg: dict) -> None:
+    """Probalis Office : l'appli de l'administrateur, à part (/office/), avec son propre manifeste et ses icônes.
+
+    Aucun lien public n'y mène ; le lien n'apparaît que dans « Mon compte » d'un administrateur. Les données ne
+    viennent que de la fonction Supabase « admin », qui vérifie l'adresse (secret ADMIN_EMAILS).
+    """
+    out = PUBLIC / "office"
+    out.mkdir()
+    lk.start("office")
+    (out / "index.html").write_text(env.get_template("office.html").render(
+        **common, page="office", root="/fr/", path="", noindex=True, no_lang=True,
+        plans=list(cfg["prices"]["plans"]), currencies=sorted(cfg["prices"]["currencies"])), encoding="utf-8")
+    (out / "manifest.webmanifest").write_text(json.dumps({
+        "name": "Probalis Office", "short_name": "Office", "description": "L'espace de l'administrateur de Probalis",
+        "id": "/office/", "start_url": "/office/", "scope": "/office/", "display": "standalone", "lang": "fr",
+        "background_color": "#0B1F3A", "theme_color": "#0B1F3A",
+        "icons": [{"src": "/icons/office-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                  {"src": "/icons/office-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                  {"src": "/icons/office-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def _site_pages(env: Environment, hist: dict, today: str, slugs: set, sim: dict | None, cfg: dict, site: dict,
                 version: str, now: datetime) -> None:
     """Le site vitrine : / en français, /welcome/ en anglais, et /app/ (point d'entrée de l'appli installée)."""
@@ -646,11 +668,16 @@ def _site_pages(env: Environment, hist: dict, today: str, slugs: set, sim: dict 
             carnet=_site_carnet(hist, today, lang, slugs), record=_site_record(hist, lang), groups=groups,
             prices=_site_prices(cfg, lang), odds=_site_odds(lang),
             qr=Markup(code.replace('aria-label="QR"', f'aria-label="{escape(s["qr_label"])}"')),
-            contact=site.get("contact_email"), year=now.year, ld=ld, js=js, shot=_shot_fn(lang))
+            contact=site.get("contact_email"), year=now.year, ld=ld, js=js, shot=_shot_fn(lang), cfg=cfg,
+            ref=config.referral_view())
         out.write_text(page, encoding="utf-8")
     app_dir = PUBLIC / "app"
     app_dir.mkdir(exist_ok=True)
     (app_dir / "index.html").write_text(env.get_template("launch.html").render(), encoding="utf-8")
+    # Lien d'invitation court, à partager : /i/CODE → page d'invitation (Cloudflare Pages, fichier _redirects)
+    (PUBLIC / "_redirects").write_text("/i/:code  /fr/invite.html?c=:code  302\n", encoding="utf-8")
+    # Probalis Office (l'appli de l'administrateur) : jamais dans les moteurs de recherche
+    (PUBLIC / "_headers").write_text("/office/*\n  X-Robots-Tag: noindex, nofollow\n", encoding="utf-8")
 
 
 def build(data: dict) -> Path:
@@ -665,6 +692,8 @@ def build(data: dict) -> Path:
     for f in (BRAND / "png").iterdir():
         shutil.copy2(f, icons / f.name)
     shutil.copy2(BRAND / "probalis-icone.svg", icons / "probalis-icone.svg")
+    # Images de partage (WhatsApp, Facebook…), dessinées par brand/og.py
+    shutil.copytree(BRAND / "og", PUBLIC / "og")
 
     version = datetime.now().strftime("%Y%m%d%H%M%S")
     generated = datetime.fromisoformat(data["generated_at"])
@@ -685,7 +714,8 @@ def build(data: dict) -> Path:
         views = [_match_view(m, lang, info, sections) for m in data["matches"] if m["league"] in BY_CODE]
         common = {"lang": lang, "t": t, "other_lang": "en" if lang == "fr" else "fr", "version": version,
                   "generated": generated, "generated_iso": data["generated_at"], "js": i18n.js_strings(lang),
-                  "cfg": cfg, "site": site, "free_markets": sorted(config.FREE_MARKETS)}
+                  "cfg": cfg, "site": site, "free_markets": sorted(config.FREE_MARKETS),
+                  "site_url": site["site_url"] or DEFAULT_SITE_URL}
         out = PUBLIC / lang
         (out / "match").mkdir(parents=True)
 
@@ -723,6 +753,16 @@ def build(data: dict) -> Path:
         lk.start(f"{lang}/compte")
         (out / "compte.html").write_text(env.get_template("account.html").render(
             **common, page="compte", root="", path="compte.html", sheet=sheet), encoding="utf-8")
+        # Récompenses (onglet du compte) et page d'invitation (lien /i/CODE)
+        ref = config.referral_view()
+        lk.start(f"{lang}/recompenses")
+        (out / "recompenses.html").write_text(env.get_template("rewards.html").render(
+            **common, page="compte", root="", path="recompenses.html", ref=ref), encoding="utf-8")
+        lk.start(f"{lang}/invite")
+        (out / "invite.html").write_text(env.get_template("invite.html").render(
+            **common, page="compte", root="", path="invite.html", ref=ref, noindex=True), encoding="utf-8")
+        if lang == "fr":
+            _office(env, lk, common, cfg)
         cur = cfg["prices"]["default_currency"][lang]
         cp = cfg["prices"]["currencies"][cur]
         lk.start(f"{lang}/premium")

@@ -7,9 +7,13 @@
 Chaque envoi est d'abord noté dans la table email_log (un e-mail par personne, par sorte et par sujet) :
 personne ne reçoit deux fois le même e-mail, même si la tâche est relancée.
 
-Variables (secrets GitHub) : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, EMAIL_FROM,
-UNSUBSCRIBE_SECRET, PROBALIS_SITE_URL. Optionnelles : EMAIL_DAILY_CAP (90 par défaut, l'offre gratuite de
-Resend permet 100 e-mails par jour), BIG_MATCH_MIN (3.0), PROBALIS_DATA (fichier ou adresse de matches.json ;
+3. Notification « analyses du jour prêtes » aux téléphones abonnés (fonction Supabase « notify », qui fait aussi
+   le ménage du jour : cadeaux non ouverts expirés, récompenses pas encore annoncées).
+
+Variables (secrets GitHub) : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, UNSUBSCRIBE_SECRET, PROBALIS_SITE_URL, et un
+moyen d'envoi : GMAIL_SCRIPT_URL + GMAIL_SCRIPT_SECRET (Gmail par Apps Script, utilisé en priorité) ou
+RESEND_API_KEY + EMAIL_FROM. Optionnelles : EMAIL_DAILY_CAP (90 par défaut : Gmail et l'offre gratuite de
+Resend permettent environ 100 e-mails par jour), BIG_MATCH_MIN (3.0), PROBALIS_DATA (fichier ou adresse de matches.json ;
 par défaut data/cache/site-matches.json, écrit par la construction du site : ces données complètes ne sont plus
 publiques en ligne, /lk/ demande un compte Premium),
 PROBALIS_CONTACT_EMAIL (adresse de réponse).
@@ -196,6 +200,42 @@ class Http:
                                  {"Authorization": f"Bearer {self.resend_key}", "Idempotency-Key": key}, emails)
         return status < 300, data
 
+    @staticmethod
+    def gmail_batch(emails: list[dict]) -> list[bool]:
+        """Envoi par le programme Apps Script (gmail_script.js) : renvoie, pour chaque e-mail, s'il est parti."""
+        url, secret = _gmail()
+        msgs = [{"to": e["to"][0], "subject": e["subject"], "html": e["html"], "text": e["text"],
+                 "replyTo": e.get("reply_to")} for e in emails]
+        status, data = Http.call("POST", url, {}, {"secret": secret, "messages": msgs})
+        if status >= 300 or not isinstance(data, dict) or not data.get("ok"):
+            print(f"::error::Gmail (Apps Script) a refusé l'envoi : {status} {str(data)[:300]}")
+            return [False] * len(emails)
+        res = data.get("results") or []
+        if data.get("error"):
+            print(f"::warning::Gmail : {data['error']} (quota restant : {data.get('remaining')})")
+        return [bool(res[i]) if i < len(res) else False for i in range(len(emails))]
+
+    def send(self, emails: list[dict], key: str) -> list[bool]:
+        """Envoie par Gmail s'il est configuré, sinon par Resend (par paquets de 100)."""
+        if _gmail()[0]:
+            out: list[bool] = []
+            for i in range(0, len(emails), 50):
+                out += self.gmail_batch(emails[i:i + 50])
+            return out
+        ok, res = self.resend_batch(emails, key)
+        if not ok:
+            print(f"::error::Resend a refusé l'envoi : {res}")
+        return [ok] * len(emails)
+
+
+def _gmail() -> tuple[str, str]:
+    url, secret = os.environ.get("GMAIL_SCRIPT_URL", "").strip(), os.environ.get("GMAIL_SCRIPT_SECRET", "").strip()
+    return (url, secret) if url and secret else ("", "")
+
+
+def mail_ready() -> bool:
+    return bool(_gmail()[0] or (os.environ.get("RESEND_API_KEY", "").strip() and os.environ.get("EMAIL_FROM", "").strip()))
+
 
 def _log(http: Http, rows: list[dict]) -> set[tuple[str, str, str]]:
     """Note les envois prévus ; ne renvoie que ceux qui n'avaient jamais été faits."""
@@ -222,9 +262,12 @@ def _first(name: str | None, email: str) -> str:
 
 def run(dry: bool = False) -> int:
     env = {k: os.environ.get(k, "").strip() for k in (
-        "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY", "EMAIL_FROM", "UNSUBSCRIBE_SECRET",
-        "PROBALIS_SITE_URL")}
-    missing = [k for k, v in env.items() if not v]
+        "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "UNSUBSCRIBE_SECRET", "PROBALIS_SITE_URL")}
+    env["RESEND_API_KEY"], env["EMAIL_FROM"] = (os.environ.get(k, "").strip() for k in ("RESEND_API_KEY", "EMAIL_FROM"))
+    missing = [k for k in ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "UNSUBSCRIBE_SECRET", "PROBALIS_SITE_URL")
+               if not env[k]]
+    if not mail_ready():
+        missing.append("GMAIL_SCRIPT_URL + GMAIL_SCRIPT_SECRET (ou RESEND_API_KEY + EMAIL_FROM)")
     if missing and not dry:
         print("::notice::E-mails non configurés (secrets manquants : " + ", ".join(missing) + "). Rien n'est envoyé.")
         return 0
@@ -248,7 +291,7 @@ def run(dry: bool = False) -> int:
                 {"desabo": unsub_kind, "u": p["id"], "t": tok})
             one_click = f"{fn_base}?" + urllib.parse.urlencode({"u": p["id"], "k": unsub_kind, "t": tok, "l": lang})
             headers = {"List-Unsubscribe": f"<{one_click}>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
-        out = {"from": env["EMAIL_FROM"], "to": [p["email"]], "subject": fill(t["subject"], v, False),
+        out = {"from": env["EMAIL_FROM"] or "Probalis", "to": [p["email"]], "subject": fill(t["subject"], v, False),
                "html": fill(t["html"], v), "text": fill(t["text"], v, False)}
         if headers:
             out["headers"] = headers
@@ -309,22 +352,53 @@ def run(dry: bool = False) -> int:
     sent = 0
     for i in range(0, len(todo), 100):
         chunk = todo[i:i + 100]
-        ok, res = http.resend_batch([e for _, e in chunk], f"probalis-daily-{now:%Y-%m-%d}-{i // 100}")
-        if ok:
-            sent += len(chunk)
-        else:
-            print(f"::error::Resend a refusé l'envoi : {res}")
-            _unlog(http, [row for row, _ in chunk])  # on réessaiera au prochain passage
+        done = http.send([e for _, e in chunk], f"probalis-daily-{now:%Y-%m-%d}-{i // 100}")
+        sent += sum(done)
+        _unlog(http, [row for (row, _), ok in zip(chunk, done) if not ok])  # on réessaiera au prochain passage
     print(f"{sent} e-mail(s) envoyé(s), {len(queue) - len(todo)} déjà envoyé(s) avant.")
+    push_daily(http, env["SUPABASE_URL"], env["SUPABASE_SERVICE_ROLE_KEY"], data, now, site)
     return 0 if sent == len(todo) else 1
+
+
+def today_push(data: dict | None, now: datetime, site: str) -> dict:
+    """Texte de la notification du jour (sans aucun chiffre Premium) : nombre de matchs et l'affiche du jour."""
+    start = now.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+    ms = [m for m in (data or {}).get("matches") or [] if m.get("kickoff") and start <= _parse(m["kickoff"]) < end]
+    top = max(ms, key=lambda m: m.get("stature") or 0) if ms else None
+    out = {}
+    for lang in LANGS:
+        if not ms:
+            body = ("Les analyses du jour sont prêtes. Ouvre Probalis pour voir les matchs."
+                    if lang == "fr" else "Today's analyses are ready. Open Probalis to see the matches.")
+        else:
+            n = len(ms)
+            name = f"{top['home']['name']} – {top['away']['name']}"
+            body = (f"{n} match{'s' if n > 1 else ''} analysé{'s' if n > 1 else ''} aujourd'hui. À la une : {name}."
+                    if lang == "fr" else f"{n} match{'es' if n > 1 else ''} analysed today. Top match: {name}.")
+        out[lang] = {"title": "Les analyses du jour sont prêtes" if lang == "fr" else "Today's analyses are ready",
+                     "body": body, "url": f"/{lang}/"}
+    return out
+
+
+def push_daily(http: Http, sb_url: str, key: str, data: dict | None, now: datetime, site: str) -> None:
+    """Demande à la fonction « notify » d'envoyer la notification du jour et de faire le ménage."""
+    h = {"apikey": key}
+    if key.startswith("eyJ"):
+        h["Authorization"] = f"Bearer {key}"
+    else:
+        h["x-probalis-key"] = key
+    status, res = http.call("POST", f"{sb_url.rstrip('/')}/functions/v1/notify", h,
+                            {"action": "daily", "day": f"{now:%Y-%m-%d}", "messages": today_push(data, now, site)})
+    print(f"Notifications du jour : {status} {str(res)[:200]}")
 
 
 def send_test(to: str, lang: str) -> int:
     """Envoie les 4 modèles (valeurs d'exemple) à une adresse, pour vérifier la configuration de Resend."""
     from . import KINDS, SAMPLES
     key, sender = os.environ.get("RESEND_API_KEY", "").strip(), os.environ.get("EMAIL_FROM", "").strip()
-    if not key or not sender:
-        print("Il faut RESEND_API_KEY et EMAIL_FROM.")
+    if not mail_ready():
+        print("Il faut GMAIL_SCRIPT_URL et GMAIL_SCRIPT_SECRET (ou RESEND_API_KEY et EMAIL_FROM).")
         return 1
     site = (os.environ.get("PROBALIS_SITE_URL") or "https://example.com").rstrip("/")
     tpls = build_templates()
@@ -334,10 +408,13 @@ def send_test(to: str, lang: str) -> int:
     picks = big_matches(data or {}, None)
     if picks:
         v.update(match_values(picks[0], picks[1:4], lang, site))
-    emails = [{"from": sender, "to": [to], "subject": "[Test] " + fill(tpls[k][lang]["subject"], v, False),
+    from . import note_html
+    v["note_html"] = note_html(v.get("note"))
+    emails = [{"from": sender or "Probalis", "to": [to], "subject": "[Test] " + fill(tpls[k][lang]["subject"], v, False),
                "html": fill(tpls[k][lang]["html"], v), "text": fill(tpls[k][lang]["text"], v, False)} for k in KINDS]
-    ok, res = Http("", "", key).resend_batch(emails, f"probalis-test-{datetime.now(timezone.utc):%Y%m%d%H%M%S}")
-    print("Envoyé." if ok else f"Refusé : {res}")
+    done = Http("", "", key).send(emails, f"probalis-test-{datetime.now(timezone.utc):%Y%m%d%H%M%S}")
+    print(f"{sum(done)} e-mail(s) de test envoyé(s) sur {len(done)}.")
+    ok = all(done)
     return 0 if ok else 1
 
 

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{{ t.rw_title }} · Probalis{% endblock %}
+{% block description %}{{ t.rw_lead }}{% endblock %}
+{% block content %}
+{% include "_acct_tabs.html" %}
+<div class="intro">
+  <div class="kicker">Probalis</div>
+  <h1 class="h1">{{ t.rw_title }}</h1>
+  <p class="lead">{{ t.rw_lead }}</p>
+</div>
+{% if cfg.demo %}<p class="demo-note">{{ icon('info', 16, 2.2) }}<span>{{ t.demo_banner }}</span></p>{% endif %}
+<p class="flash" id="flash" role="status" hidden></p>
+
+<div class="acct rw" id="rw" data-state="" aria-live="polite">
+  <div class="acct-loading" aria-hidden="true">
+    <div class="sk sk-block" style="height: 120px"></div>
+    <div class="sk sk-block" style="height: 260px"></div>
+  </div>
+
+  <section class="card rw-out" data-when="out">
+    <span class="soon-ic">{{ icon('gift', 28, 2) }}</span>
+    <p>{{ t.rw_signin }}</p>
+    <a class="btn" id="rw-signin" href="{{ root }}compte.html">{{ icon('user', 18, 2.2) }}{{ t.rw_signin_btn }}</a>
+  </section>
+
+  <div class="rw-in" data-when="in">
+    <section class="card rw-balance" aria-labelledby="rw-bal-title">
+      <span class="rb-ic" aria-hidden="true">{{ icon('zap', 22, 2.2) }}</span>
+      <div class="rb-txt"><b class="num" id="rw-bonus">0</b><h2 id="rw-bal-title">{{ t.rw_balance }}</h2></div>
+      <p class="note">{{ t.rw_balance_help }}</p>
+    </section>
+
+    <section class="rw-group" id="rw-waiting-box" aria-labelledby="rw-waiting-title" hidden>
+      <h2 class="rw-h" id="rw-waiting-title">{{ t.rw_waiting }}</h2>
+      <div class="rw-items" id="rw-waiting"></div>
+    </section>
+
+    <section class="card invite" aria-labelledby="inv-title">
+      <h2 id="inv-title">{{ icon('users', 20, 2.2) }}{{ t.inv_title }}</h2>
+      <p class="note">{{ t.inv_lead }}</p>
+      <ol class="inv-steps">
+        <li><span>{{ t.inv_signup }}</span><b class="num" data-ref="signup">+{{ ref.signup }}</b></li>
+        <li><span data-ref-text="active">{{ t.inv_active.format(d=ref.active_days) }}</span><b class="num" data-ref="active">+{{ ref.active }}</b></li>
+        <li><span>{{ t.inv_buy }}<small>{{ t.inv_buy_detail }}</small></span><b class="num" data-ref="buy">+{{ ref.buy_min }}{{ ' à ' if lang == 'fr' else ' to ' }}+{{ ref.buy_max }}</b></li>
+      </ol>
+      <p class="inv-welcome" data-ref-text="welcome">{{ icon('gift', 16, 2.2) }}<span>{{ t.inv_welcome.format(n=ref.welcome) }}</span></p>
+      <label class="inv-link" for="inv-url">{{ t.inv_link }}</label>
+      <div class="il-row">
+        <input id="inv-url" class="num" readonly value="" aria-describedby="inv-count">
+        <button class="btn ghost" id="inv-copy" type="button">{{ icon('copy', 18, 2.2) }}<span>{{ t.inv_copy }}</span></button>
+      </div>
+      <div class="inv-share">
+        <a class="btn wa" id="inv-wa" href="#" target="_blank" rel="noopener">{{ icon('chat', 18, 2.2) }}<span>{{ t.inv_share_wa }}</span></a>
+        <button class="btn ghost" id="inv-share" type="button" hidden>{{ icon('share', 18, 2.2) }}<span>{{ t.inv_share }}</span></button>
+      </div>
+      <p class="note inv-count" id="inv-count" hidden></p>
+      <p class="note small" data-ref-text="cap">{{ t.inv_cap.format(n=ref.monthly_cap) }}</p>
+    </section>
+
+    <section class="rw-group" id="rw-history-box" aria-labelledby="rw-history-title" hidden>
+      <h2 class="rw-h" id="rw-history-title">{{ t.rw_history }}</h2>
+      <div class="rw-items" id="rw-history"></div>
+    </section>
+    <p class="note center" id="rw-empty" hidden>{{ t.rw_empty }}</p>
+  </div>
+</div>
+<template id="rw-ic-premium">{{ icon('crown', 20, 2.2) }}</template>
+<template id="rw-ic-analyses">{{ icon('zap', 20, 2.2) }}</template>
+<script id="pb-ref-cfg" type="application/json">{{ ref|tojson }}</script>
+{% endblock %}

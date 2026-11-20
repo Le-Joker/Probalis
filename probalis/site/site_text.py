@@ -117,7 +117,8 @@ SITE = {
         "price_cur_label": "Monnaie",
         "free_name": "Gratuit", "free_price": "0", "free_unit": "avec un compte Google",
         "free_items": ["1 analyse complète par jour, sur le match de ton choix", "Le n° 1 de chaque liste du jour",
-                       "Ton coupon analysé jusqu'à 3 matchs", "Tout l'historique", "Quelques pubs"],
+                       "Ton coupon analysé jusqu'à 3 matchs", "Tout l'historique",
+                       "Des analyses en plus quand tu invites tes amis", "Quelques pubs"],
         "free_cta": "Créer mon compte gratuit",
         "prem_name": "Premium", "prem_from": "Dès", "prem_from_unit": "pour 7 jours",
         "passes_label": "Les 5 durées du pass Premium",
@@ -128,6 +129,8 @@ SITE = {
                        "Ton coupon analysé jusqu'à 10 matchs", "Sans pub"],
         "prem_note": "Pass sans abonnement : tu paies une fois, rien ne se renouvelle tout seul. "
                      "Le paiement par mobile money et carte ouvre très bientôt.",
+        "prem_note_wa": "Pass sans abonnement : tu paies une fois, rien ne se renouvelle tout seul. "
+                        "Pour l'instant, le paiement se fait avec nous sur WhatsApp, au {n} : ton pass est activé dès réception.",
         "prem_cta": "Découvrir Premium",
 
         "inst_h2": "Installe Probalis en 10 secondes.",
@@ -175,7 +178,15 @@ SITE = {
              "C'est la cote qu'un pari mériterait sans marge : 1 divisé par sa chance. Un pari à 80 % a une cote juste de 1,25. "
              "Si ton bookmaker paie moins, c'est sa marge."),
             ("Ça marche avec une petite connexion ?",
-             "Oui. L'appli est légère, garde sur ton téléphone les pages déjà vues et les affiche quand le réseau traîne."),
+             "Oui. L'appli est légère et charge l'essentiel d'abord. Il faut quand même Internet : sans connexion, elle te demande "
+             "de te reconnecter, pour ne jamais te montrer une analyse dépassée."),
+            ("Comment avoir des analyses en plus, gratuitement ?",
+             "Invite tes amis avec ton lien (dans Mon compte → Récompenses). Tu gagnes {signup} analyses de match quand un ami "
+             "s'inscrit, {active} de plus quand il utilise Probalis {active_days} jours, et de {buy_min} à {buy_max} s'il prend un pass "
+             "Premium. Ton ami reçoit {welcome} analyses à son arrivée. Tu les utilises sur les matchs de ton choix."),
+            ("Probalis m'envoie-t-il des notifications ?",
+             "Seulement si tu les actives dans Mon compte : un rappel par jour au plus quand les paris du jour sont prêts, et un "
+             "message quand tu reçois un cadeau. Tu les coupes quand tu veux, d'un geste."),
             ("Combien coûte Premium ?",
              "Dès {week} pour 7 jours, {month} pour 30 jours, et jusqu'à {year} pour un an : plus le pass est long, "
              "moins le jour coûte cher. Sans abonnement, et le compte gratuit reste gratuit."),
@@ -296,7 +307,8 @@ SITE = {
         "price_cur_label": "Currency",
         "free_name": "Free", "free_price": "0", "free_unit": "with a Google account",
         "free_items": ["1 full analysis a day, on the match of your choice", "The no. 1 of each daily list",
-                       "Your slip analysed up to 3 matches", "The full history", "A few ads"],
+                       "Your slip analysed up to 3 matches", "The full history",
+                       "Extra analyses when you invite friends", "A few ads"],
         "free_cta": "Create my free account",
         "prem_name": "Premium", "prem_from": "From", "prem_from_unit": "for 7 days",
         "passes_label": "The 5 Premium pass lengths",
@@ -307,6 +319,8 @@ SITE = {
                        "Your slip analysed up to 10 matches", "No ads"],
         "prem_note": "A pass, not a subscription: you pay once and nothing renews by itself. "
                      "Mobile money and card payments open very soon.",
+        "prem_note_wa": "A pass, not a subscription: you pay once and nothing renews by itself. "
+                        "For now, payment is done with us on WhatsApp, at {n}: your pass is switched on as soon as it arrives.",
         "prem_cta": "Discover Premium",
 
         "inst_h2": "Install Probalis in 10 seconds.",
@@ -354,7 +368,15 @@ SITE = {
              "The odds a bet would deserve with no margin: 1 divided by its chance. An 80% bet has fair odds of 1.25. If your "
              "bookmaker pays less, that's its margin."),
             ("Does it work on a slow connection?",
-             "Yes. The app is light, keeps the pages you've already seen on your phone and shows them when the network drags."),
+             "Yes. The app is light and loads the essentials first. It still needs the internet: with no connection it asks you to "
+             "reconnect, so it never shows you an outdated analysis."),
+            ("How do I get extra analyses for free?",
+             "Invite your friends with your link (in My account → Rewards). You earn {signup} match analyses when a friend signs up, "
+             "{active} more when they use Probalis on {active_days} days, and {buy_min} to {buy_max} if they buy a Premium pass. "
+             "Your friend gets {welcome} analyses when they join. Use them on the matches you choose."),
+            ("Does Probalis send notifications?",
+             "Only if you turn them on in My account: at most one reminder a day when today's bets are ready, and a message when "
+             "you receive a gift. Turn them off whenever you like."),
             ("How much is Premium?",
              "From {week} for 7 days, {month} for 30 days, up to {year} for a year: the longer the pass, the less each "
              "day costs. No subscription, and the free account stays free."),

@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{# Probalis Office : l'appli de l'administrateur, à l'adresse /office/ (français seulement, aucun lien public n'y mène).
+   Elle a son propre nom, ses icônes dorées et son manifeste : on l'installe à côté de l'appli Probalis des membres.
+   Tout passe par la fonction Supabase « admin », réservée aux adresses du secret ADMIN_EMAILS : cette page ne
+   contient aucune donnée, elle ne fait que l'afficher. #}
+{% block title %}Probalis Office{% endblock %}
+{% block description %}L'espace de l'administrateur de Probalis.{% endblock %}
+{% block social %}{% endblock %}
+{% block app_meta %}
+<meta name="theme-color" content="#0B1F3A">
+<meta name="application-name" content="Probalis Office">
+<meta name="apple-mobile-web-app-title" content="Office">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/office/manifest.webmanifest">
+<link rel="icon" href="/icons/office-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icons/office-apple-180.png">
+{% endblock %}
+{% block head %}<link rel="stylesheet" href="/assets/admin.css?v={{ version }}">{% endblock %}
+{% block header %}
+<header class="top">
+  <a class="brand" href="/office/" data-reload aria-label="Probalis Office">{{ logo_mark(36, '#FACC15') }}<span class="wordmark" aria-hidden="true">Proba<span>lis</span></span><span class="office-tag" aria-hidden="true">Office</span></a>
+  <div class="actions">
+    <button class="round" type="button" id="adm-install" hidden aria-label="Installer Probalis Office" title="Installer Probalis Office">{{ icon('download') }}</button>
+    <button class="round theme" type="button" aria-label="{{ t.theme }}" title="{{ t.theme }}">{{ icon('moon') }}{{ icon('sun') }}</button>
+    <button class="round" type="button" id="adm-signout" hidden aria-label="Se déconnecter" title="Se déconnecter">{{ icon('logout') }}</button>
+  </div>
+</header>
+{% endblock %}
+{% block footer %}{% endblock %}
+{% block tabbar %}{% endblock %}
+{% block content %}
+<h1 class="sr-only">Probalis Office</h1>
+{% if cfg.demo %}<p class="demo-note">{{ icon('info', 16, 2.2) }}<span>Mode démo : de faux membres, rien n'est envoyé ni enregistré. Le vrai tableau de bord s'affiche une fois Supabase branché.</span></p>{% endif %}
+
+<div class="adm" id="adm" data-state="" aria-live="polite">
+  <div class="acct-loading" aria-hidden="true">
+    <div class="sk sk-block" style="height: 46px"></div>
+    <div class="sk sk-block" style="height: 220px"></div>
+    <div class="sk sk-block" style="height: 160px"></div>
+  </div>
+
+  <section class="card adm-gate office-gate" data-when="out">
+    <img class="office-ic" src="/icons/office-192.png" width="72" height="72" alt="">
+    <h2>Probalis Office</h2>
+    <p class="note">L'espace de l'administrateur : membres, paiements, cadeaux, e-mails et réglages.</p>
+    <button class="gbtn" type="button" id="adm-signin">{{ google_g }}<span>Se connecter avec Google</span></button>
+    <p class="note small">Seules les adresses Google inscrites dans le réglage ADMIN_EMAILS de Supabase ouvrent Office.</p>
+  </section>
+  <section class="card adm-gate" data-when="denied">
+    <span class="soon-ic bad">{{ icon('shield', 26, 2.2) }}</span>
+    <h2>Ce compte n'a pas accès à Probalis Office</h2>
+    <p class="note" id="adm-denied-text">Ajoute son adresse au réglage ADMIN_EMAILS de Supabase, puis recharge la page.</p>
+    <button class="btn ghost" type="button" data-signout>{{ icon('logout', 18, 2.2) }}Changer de compte</button>
+  </section>
+
+  <div class="adm-in" data-when="in">
+    <nav class="adm-tabs scroll-x" role="tablist" aria-label="Rubriques">
+    {% for key, ic, label in [('dash', 'grid', 'Tableau de bord'), ('members', 'users', 'Membres'), ('payments', 'card', 'Paiements'),
+                              ('rewards', 'gift', 'Récompenses'), ('emails', 'mail', 'E-mails'), ('log', 'history', 'Journal'),
+                              ('settings', 'sliders', 'Réglages')] %}
+      <button type="button" role="tab" id="tab-{{ key }}" aria-controls="pane-{{ key }}" data-tab="{{ key }}" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ icon(ic, 17, 2.2) }}<span>{{ label }}</span></button>
+    {% endfor %}
+    </nav>
+
+    {# ---------- Tableau de bord ---------- #}
+    <section class="adm-pane" id="pane-dash" role="tabpanel" aria-labelledby="tab-dash">
+      <div class="kpis" id="kpis"></div>
+      <section class="card adm-chart" aria-labelledby="chart-title">
+        <div class="card-head"><h2 id="chart-title">Inscriptions des 14 derniers jours</h2><b class="num" id="chart-total"></b></div>
+        <div class="bars" id="bars" role="img" aria-describedby="bars-table"></div>
+        <div class="bars-axis" id="bars-axis" aria-hidden="true"></div>
+        <table class="sr-only" id="bars-table"><caption>Inscriptions par jour</caption><tbody></tbody></table>
+      </section>
+      <section class="card adm-money" aria-labelledby="money-title">
+        <h2 id="money-title">Encaissé sur 30 jours</h2>
+        <div class="money-rows" id="money-rows"></div>
+      </section>
+      <div class="adm-quick">
+        <button class="btn ghost" type="button" data-go="members">{{ icon('gift', 18, 2.2) }}Offrir un cadeau</button>
+        <button class="btn ghost" type="button" data-go="members" data-then="pay">{{ icon('card', 18, 2.2) }}Paiement WhatsApp reçu</button>
+      </div>
+    </section>
+
+    {# ---------- Membres ---------- #}
+    <section class="adm-pane" id="pane-members" role="tabpanel" aria-labelledby="tab-members" hidden>
+      <label class="search adm-search">{{ icon('search', 18, 2.2) }}<input type="search" id="m-q" placeholder="Nom, e-mail ou code de parrainage" autocomplete="off" aria-label="Chercher un membre"></label>
+      <div class="adm-chips" role="group" aria-label="Filtre">
+        <button type="button" data-filter="all" aria-pressed="true">Tous</button>
+        <button type="button" data-filter="premium" aria-pressed="false">Premium</button>
+        <button type="button" data-filter="free" aria-pressed="false">Gratuit</button>
+        <button type="button" data-filter="referred" aria-pressed="false">Parrainés</button>
+      </div>
+      <p class="adm-count" id="m-count"></p>
+      <div class="adm-list" id="m-list"></div>
+      <button class="btn ghost adm-more" type="button" id="m-more" hidden>Voir plus</button>
+    </section>
+
+    {# ---------- Paiements ---------- #}
+    <section class="adm-pane" id="pane-payments" role="tabpanel" aria-labelledby="tab-payments" hidden>
+      <p class="note">Un paiement reçu sur WhatsApp s'enregistre depuis la fiche du membre (menu ⋮ → « Paiement WhatsApp reçu ») : le Premium s'active, le reçu part par e-mail et le parrain reçoit ses analyses.</p>
+      <div class="adm-list" id="p-list"></div>
+      <button class="btn ghost adm-more" type="button" id="p-more" hidden>Voir plus</button>
+    </section>
+
+    {# ---------- Récompenses ---------- #}
+    <section class="adm-pane" id="pane-rewards" role="tabpanel" aria-labelledby="tab-rewards" hidden>
+      <div class="adm-chips" role="group" aria-label="État">
+        <button type="button" data-rstatus="" aria-pressed="true">Toutes</button>
+        <button type="button" data-rstatus="sent" aria-pressed="false">Pas encore ouvertes</button>
+        <button type="button" data-rstatus="available" aria-pressed="false">À activer</button>
+        <button type="button" data-rstatus="used" aria-pressed="false">Utilisées</button>
+        <button type="button" data-rstatus="expired" aria-pressed="false">Expirées</button>
+        <button type="button" data-rstatus="cancelled" aria-pressed="false">Annulées</button>
+      </div>
+      <div class="adm-chips" role="group" aria-label="Origine">
+        <button type="button" data-rsource="" aria-pressed="true">Toutes origines</button>
+        <button type="button" data-rsource="gift" aria-pressed="false">Cadeaux</button>
+        <button type="button" data-rsource="referral" aria-pressed="false">Parrainage</button>
+      </div>
+      <div class="adm-list" id="r-list"></div>
+      <button class="btn ghost adm-more" type="button" id="r-more" hidden>Voir plus</button>
+    </section>
+
+    {# ---------- E-mails ---------- #}
+    <section class="adm-pane" id="pane-emails" role="tabpanel" aria-labelledby="tab-emails" hidden>
+      <div class="adm-row-actions">
+        <button class="btn ghost" type="button" data-email-test="fr">{{ icon('mail', 18, 2.2) }}M'envoyer un test (FR)</button>
+        <button class="btn ghost" type="button" data-email-test="en">{{ icon('mail', 18, 2.2) }}Test (EN)</button>
+      </div>
+      <div class="adm-list" id="e-list"></div>
+      <button class="btn ghost adm-more" type="button" id="e-more" hidden>Voir plus</button>
+    </section>
+
+    {# ---------- Journal ---------- #}
+    <section class="adm-pane" id="pane-log" role="tabpanel" aria-labelledby="tab-log" hidden>
+      <p class="note">Tout ce qui est fait depuis cette page est noté ici : cadeaux, paiements enregistrés, réglages, annonces.</p>
+      <div class="adm-list" id="l-list"></div>
+      <button class="btn ghost adm-more" type="button" id="l-more" hidden>Voir plus</button>
+    </section>
+
+    {# ---------- Réglages ---------- #}
+    <section class="adm-pane" id="pane-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+      <form class="card adm-form" id="ref-form" aria-labelledby="ref-title">
+        <h2 id="ref-title">{{ icon('users', 18, 2.2) }}Barème du parrainage</h2>
+        <p class="note">Analyses de match gagnées par le parrain pour chaque action de son ami (jamais de Premium). Les pages de l'appli suivent ces chiffres.</p>
+        <div class="num-grid">
+          <label><span>Ami inscrit</span><input type="number" name="signup" min="0" max="100" inputmode="numeric" required></label>
+          <label><span>Ami actif</span><input type="number" name="active" min="0" max="100" inputmode="numeric" required></label>
+          <label><span>… après combien de jours d'utilisation</span><input type="number" name="active_days" min="1" max="60" inputmode="numeric" required></label>
+          <label><span>Cadeau de bienvenue de l'ami</span><input type="number" name="welcome" min="0" max="100" inputmode="numeric" required></label>
+          <label><span>Plafond par mois et par parrain</span><input type="number" name="monthly_cap" min="0" max="1000" inputmode="numeric" required></label>
+        </div>
+        <h3 class="sub">Achat d'un pass par l'ami</h3>
+        <div class="num-grid">
+        {% for p in plans %}
+          <label><span data-plan-label="{{ p }}">{{ p }}</span><input type="number" name="buy_{{ p }}" min="0" max="100" inputmode="numeric" required></label>
+        {% endfor %}
+        </div>
+        <button class="btn" type="submit">{{ icon('check', 18, 2.4) }}Enregistrer le barème</button>
+      </form>
+
+      <form class="card adm-form" id="bc-form" aria-labelledby="bc-title">
+        <h2 id="bc-title">{{ icon('bell', 18, 2.2) }}Annonce par notification</h2>
+        <p class="note" id="bc-devices">Envoyée à tous les téléphones qui ont activé les notifications. Pas d'e-mail.</p>
+        <label class="adm-field"><span>Titre</span><input name="title" maxlength="80" required placeholder="Ex. : Les paris du week-end sont prêts"></label>
+        <label class="adm-field"><span>Texte</span><textarea name="body" maxlength="240" rows="3" required placeholder="Sans promesse de gain."></textarea></label>
+        <label class="adm-field"><span>Page ouverte au toucher</span>
+          <select name="url">
+            <option value="/fr/index.html">Accueil (matchs)</option>
+            <option value="/fr/paris.html">Paris du jour</option>
+            <option value="/fr/premium.html">Premium</option>
+            <option value="/fr/recompenses.html">Récompenses</option>
+          </select>
+        </label>
+        <div class="adm-row-actions">
+          <button class="btn" type="submit">{{ icon('bell', 18, 2.2) }}Envoyer l'annonce</button>
+          <button class="btn ghost" type="button" id="push-test">Tester sur mon téléphone</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+
+{# Fenêtre commune : fiche d'un membre, menu ⋮, cadeau, paiement, confirmation #}
+<dialog class="sheet adm-sheet" id="adm-sheet" aria-labelledby="adm-sheet-title">
+  <div class="handle" aria-hidden="true"></div>
+  <div class="sheet-head"><h2 id="adm-sheet-title"></h2><button class="round" type="button" id="adm-close" aria-label="Fermer">{{ icon('x', 20, 2.4) }}</button></div>
+  <div class="sheet-body adm-sheet-body" id="adm-sheet-body"></div>
+</dialog>
+
+{# Icônes reprises par le script #}
+<template id="ic-more">{{ icon('dots', 20, 2.6) }}</template>
+<template id="ic-crown">{{ icon('crown', 18, 2.2) }}</template>
+<template id="ic-gift">{{ icon('gift', 18, 2.2) }}</template>
+<template id="ic-zap">{{ icon('zap', 18, 2.2) }}</template>
+<template id="ic-card">{{ icon('card', 18, 2.2) }}</template>
+<template id="ic-x">{{ icon('x', 18, 2.4) }}</template>
+<template id="ic-user">{{ icon('user', 18, 2.2) }}</template>
+<template id="ic-copy">{{ icon('copy', 18, 2.2) }}</template>
+<template id="ic-chat">{{ icon('chat', 18, 2.2) }}</template>
+<template id="ic-mail">{{ icon('mail', 18, 2.2) }}</template>
+<template id="ic-bell">{{ icon('bell', 18, 2.2) }}</template>
+<template id="ic-check">{{ icon('check', 18, 2.4) }}</template>
+<template id="ic-clock">{{ icon('clock', 18, 2.2) }}</template>
+<template id="ic-users">{{ icon('users', 18, 2.2) }}</template>
+<template id="ic-chart">{{ icon('chart', 18, 2.2) }}</template>
+<template id="ic-phone">{{ icon('phone', 18, 2.2) }}</template>
+<template id="ic-refresh">{{ icon('refresh', 18, 2.2) }}</template>
+<script id="adm-data" type="application/json">{{ {"plans": plans, "currencies": currencies}|tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="/assets/admin.js?v={{ version }}"></script>{% endblock %}

@@ -9,6 +9,9 @@ Variables lues au moment du build :
   PROBALIS_SUPABASE_ANON_KEY  clé publique « anon » ou « publishable » (faite pour être dans le site)
   PROBALIS_CONTACT_EMAIL      adresse de contact affichée dans les pages légales
   PROBALIS_OWNER_NAME         nom de l'éditeur du site (pages légales)
+  PROBALIS_PAYMENTS           « online » quand Stripe / Flutterwave sont branchés. Sinon (par défaut), le bouton
+                              Premium ouvre WhatsApp avec un message prêt, et l'admin active le pass à la main.
+  PROBALIS_WHATSAPP           numéro WhatsApp du bouton Premium, chiffres seulement (par défaut celui de Probalis)
 
 Jamais de clé secrète ici : les clés Stripe, Flutterwave, Resend et la clé « service_role » de Supabase
 restent dans les secrets des fonctions Supabase et de GitHub.
@@ -30,6 +33,21 @@ SUPABASE_JS_SRI = "sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpS
 # Gratuit : 1 analyse complète par jour, sur le match choisi (compté sur le téléphone, voir static/app.js).
 # Aucun marché n'est ouvert sur tous les matchs : chaque page de match reste verrouillée jusqu'à ce choix.
 FREE_MARKETS: frozenset[str] = frozenset()
+
+# Barème du parrainage par défaut (le vrai est dans la base, table settings, réglable dans l'admin) : analyses
+# offertes au parrain à chaque étape de son ami, et bonus de bienvenue de l'ami. Mêmes valeurs que la migration.
+REFERRAL_DEFAULTS = {"signup": 2, "active": 3, "active_days": 3, "welcome": 2, "monthly_cap": 10,
+                     "purchase": {"week": 4, "month": 5, "quarter": 6, "half": 8, "year": 10}}
+
+
+def referral_view() -> dict:
+    r = REFERRAL_DEFAULTS
+    return {**{k: v for k, v in r.items() if k != "purchase"},
+            "buy_min": min(r["purchase"].values()), "buy_max": max(r["purchase"].values())}
+
+
+# Numéro public de Probalis pour payer Premium tant que le paiement en ligne n'est pas branché
+WHATSAPP_DEFAULT = "237670375810"
 
 
 def _env(name: str) -> str:
@@ -53,7 +71,14 @@ def site() -> dict:
         "demo": not (url and key),
         "contact_email": _env("PROBALIS_CONTACT_EMAIL"),
         "owner_name": _env("PROBALIS_OWNER_NAME"),
+        "pay": "online" if _env("PROBALIS_PAYMENTS").lower() in ("online", "on", "1") else "whatsapp",
+        "whatsapp": "".join(ch for ch in (_env("PROBALIS_WHATSAPP") or WHATSAPP_DEFAULT) if ch.isdigit()),
     }
+
+
+def whatsapp_display(num: str) -> str:
+    """« 237670375810 » → « +237 670375810 » (comme le numéro est écrit partout ailleurs)."""
+    return f"+{num[:3]} {num[3:]}" if num.startswith("237") and len(num) == 12 else f"+{num}"
 
 
 def public_config() -> dict:
@@ -64,4 +89,7 @@ def public_config() -> dict:
         "sb": {"url": s["supabase_url"], "key": s["supabase_key"], "lib": SUPABASE_JS, "sri": SUPABASE_JS_SRI}
         if not s["demo"] else None,
         "prices": prices(),
+        "pay": s["pay"],
+        "wa": s["whatsapp"] if s["pay"] == "whatsapp" else None,
+        "wa_n": whatsapp_display(s["whatsapp"]) if s["pay"] == "whatsapp" else None,
     }

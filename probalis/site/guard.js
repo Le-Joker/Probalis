@@ -50,7 +50,7 @@ async function profile(token, ctx, fresh) {
   }
   let r;
   try {
-    r = await fetch(SB_URL + '/rest/v1/profiles?select=premium_until,free_day,free_match&limit=1', {
+    r = await fetch(SB_URL + '/rest/v1/profiles?select=premium_until,free_day,free_match,extra_matches&limit=1', {
       headers: { apikey: SB_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' }
     });
   } catch (e) {
@@ -77,7 +77,10 @@ export async function onRequest(ctx) {
   const auth = BEARER.exec(request.headers.get('Authorization') || '');
   if (!auth) return deny(401);
 
-  const allowed = (p) => premium(p) || !!m[1] || (!!m[2] && p.free_match === m[2] && recent(p.free_day));
+  // Premium : tout ; compte gratuit : le n° 1 de chaque liste, le match de son analyse du jour et ceux ouverts avec
+  // une analyse offerte (parrainage, cadeau)
+  const extra = (p) => Array.isArray(p.extra_matches) && p.extra_matches.includes(m[2]);
+  const allowed = (p) => premium(p) || !!m[1] || (!!m[2] && ((p.free_match === m[2] && recent(p.free_day)) || extra(p)));
   let p = await profile(auth[1], ctx, false);
   // Le profil a pu changer depuis la dernière vérification (analyse gratuite choisie, Premium acheté) : on revérifie
   if (p && !allowed(p)) p = await profile(auth[1], ctx, true);

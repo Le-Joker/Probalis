@@ -40,14 +40,23 @@
 {% endfor %}
 </div>
 <p class="note save-note">{{ t.save_note }}</p>
+{% if cfg.pay == 'whatsapp' %}
+{# Paiement en ligne pas encore branché : on écrit à Probalis sur WhatsApp, message prêt (app.js) #}
+<p class="methods"><span class="m-ic">{{ icon('phone', 18, 2.2) }}</span><span>{{ t.wa_methods }}</span></p>
+<a class="btn pay wa" id="pay-btn" href="https://wa.me/{{ cfg.wa }}" target="_blank" rel="noopener" data-wa="{{ cfg.wa }}">{{ icon('chat', 20, 2.2) }}<span>{{ t.wa_btn.format(n=cfg.wa_n) }}</span></a>
+<p class="note center">{{ t.wa_secure }}</p>
+{% else %}
 <p class="methods"><span class="m-ic">{{ icon('card', 18, 2.2) }}{{ icon('phone', 18, 2.2) }}</span><span id="pay-methods" data-stripe="{{ t.methods_stripe }}" data-flutterwave="{{ t.methods_flutterwave }}">{{ t.methods_stripe }}</span></p>
 <button class="btn pay js-only" id="pay-btn" type="button">{{ icon('lock', 18, 2.4) }}<span>{{ t.go_premium }}</span></button>
 <p class="note center" id="pay-secure" data-stripe="{{ t.secure_stripe }}" data-flutterwave="{{ t.secure_flutterwave }}">{{ t.secure_stripe }}</p>
+{% endif %}
 <p class="note center">{{ t.no_renewal }}</p>
 
 <section class="card faq" aria-labelledby="faq-title">
   <h2 id="faq-title">{{ t.faq_title }}</h2>
   {% for q, a in t.faq %}
+  {# 2e question (mobile money) : remplacée par le paiement sur WhatsApp tant que le paiement en ligne n'est pas branché #}
+  {% if cfg.pay == 'whatsapp' and loop.index == 2 %}{% set q = t.faq_pay_wa[0] %}{% set a = t.faq_pay_wa[1].format(n=cfg.wa_n) %}{% endif %}
   <details><summary>{{ q }}{{ icon('chev-down', 16, 2.4) }}</summary><p>{{ a }}</p></details>
   {% endfor %}
 </section>

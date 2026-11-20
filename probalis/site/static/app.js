@@ -140,19 +140,55 @@
       if (ms) hideT = setTimeout(hide, ms);
     };
     var hide = function () { if (el) el.classList.remove('on'); };
+    // L'appli ne marche pas hors connexion : un écran couvre la page tant qu'Internet manque
+    var screen = null;
+    // Vraie vérification : le téléphone peut se dire « en ligne » sans Internet (Wi-Fi sans accès)
+    var check = function () {
+      if (navigator.onLine === false || !win.fetch) return Promise.resolve(navigator.onLine !== false);
+      return fetch('/manifest.webmanifest?ping=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+        .then(function (r) { return r.ok; }, function () { return false; });
+    };
+    var offline = function () {
+      hide();
+      if (!screen) {
+        screen = doc.createElement('div');
+        screen.className = 'offline-screen';
+        screen.setAttribute('role', 'alertdialog');
+        screen.setAttribute('aria-modal', 'true');
+        screen.setAttribute('aria-labelledby', 'off-title');
+        screen.innerHTML = '<div class="off-card"><span class="off-ic">' + icons.offline.replace(/width="18" height="18"/, 'width="30" height="30"') +
+          '</span><h2 id="off-title"></h2><p></p><button type="button" class="btn"></button><small></small></div>';
+        screen.querySelector('h2').textContent = T.off_title || 'Offline';
+        screen.querySelector('p').textContent = T.off_text || '';
+        screen.querySelector('small').textContent = T.off_wait || '';
+        var b = screen.querySelector('button');
+        b.textContent = T.off_retry || 'Retry';
+        b.addEventListener('click', function () { b.disabled = true; check().then(function (ok) { b.disabled = false; if (ok) online(); }); });
+      }
+      if (!screen.isConnected) doc.body.appendChild(screen);
+      root.classList.add('is-offline');
+      screen.querySelector('button').focus({ preventScroll: true });
+    };
+    var online = function () {
+      if (!screen || !screen.isConnected) return;
+      screen.remove();
+      root.classList.remove('is-offline');
+      show('ok', T.net_online, 2500);
+    };
     return {
       slow: function () {
         if (session.get('pb-slow-shown')) return;
         session.set('pb-slow-shown', '1');
         show('slow', T.net_slow, 6000);
       },
-      offline: function () { show('offline', T.net_offline); },
-      online: function () { show('ok', T.net_online, 2500); },
+      offline: offline,
+      online: online,
       hide: hide
     };
   })();
   win.addEventListener('offline', function () { netbar.offline(); });
   win.addEventListener('online', function () { netbar.online(); });
+  win.addEventListener('pageshow', function (e) { if (e.persisted && navigator.onLine === false) netbar.offline(); });
   if (navigator.onLine === false) netbar.offline();
   else if (slowNet()) setTimeout(netbar.slow, 800);
   if (conn && conn.addEventListener) {
@@ -201,7 +237,8 @@
 
     var defaults = function () {
       return { premium_until: null, email_news: false, email_reminders: true, favorite_leagues: [], lang: lang, country: null,
-        is_adult: false, welcome_sent_at: null, tz: null, free_day: null, free_match: null };
+        is_adult: false, welcome_sent_at: null, tz: null, free_day: null, free_match: null,
+        bonus_analyses: 0, extra_matches: [], ref_code: null, role: 'member', push_daily: true };
     };
     var isPremium = function (s) {
       s = s === undefined ? state : s;
@@ -251,7 +288,53 @@
         save(s);
         return Promise.resolve({ demo: true, until: s.profile.premium_until });
       },
-      confirm: function () { return Promise.resolve(); }
+      confirm: function () { return Promise.resolve(); },
+      // Récompenses simulées : un bonus d'exemple, et le cadeau d'un lien d'e-mail (?r=…&t=…)
+      rewards: function () {
+        var s = clone(state);
+        if (!s.demoRewards) {
+          s.demoRewards = [{ id: 'demo-welcome', kind: 'analyses', amount: 2, plan: null, days: null, source: 'welcome_bonus',
+            note: null, status: 'available', created_at: new Date().toISOString(), used_at: null, expires_at: null }];
+          save(s);
+        }
+        return Promise.resolve(clone(s.demoRewards));
+      },
+      member: function (body) {
+        var s = clone(state);
+        var list = s.demoRewards || [];
+        var find = function (id) { return list.filter(function (r) { return r.id === id; })[0]; };
+        if (body.action === 'claim') {
+          if (!find(body.id)) list.unshift({ id: body.id, kind: 'premium', plan: 'week', days: 7, amount: null, source: 'gift',
+            note: null, status: 'available', created_at: new Date().toISOString(), used_at: null, expires_at: null });
+          s.demoRewards = list;
+          save(s);
+          return Promise.resolve({ ok: true, status: 'available' });
+        }
+        if (body.action === 'activate') {
+          var r = find(body.id);
+          if (!r || r.status !== 'available') return Promise.reject(Object.assign(new Error('not_available'), { code: 'not_available' }));
+          r.status = 'used';
+          r.used_at = new Date().toISOString();
+          if (r.kind === 'premium') s.profile.premium_until = addDays(s.profile.premium_until, r.days);
+          else s.profile.bonus_analyses = (s.profile.bonus_analyses || 0) + r.amount;
+          s.demoRewards = list;
+          save(s);
+          return Promise.resolve({ ok: true, kind: r.kind, plan: r.plan, premium_until: s.profile.premium_until,
+            bonus_analyses: s.profile.bonus_analyses, applied: true });
+        }
+        return Promise.resolve({ ok: true });
+      },
+      useBonus: function (slug) {
+        var s = clone(state);
+        var ex = s.profile.extra_matches || [];
+        if (ex.indexOf(slug) < 0) {
+          if (!(s.profile.bonus_analyses > 0)) return Promise.reject(new Error('none'));
+          s.profile.bonus_analyses -= 1;
+          s.profile.extra_matches = ex.concat([slug]).slice(-60);
+        }
+        return Promise.resolve(save(s));
+      },
+      referral: function () { return Promise.resolve(null); }
     };
 
     // Vrai mode : Supabase (connexion Google, profil, fonctions de paiement et d'e-mail)
@@ -292,10 +375,10 @@
           });
         });
       },
-      signIn: function () {
+      signIn: function (back) {
         return sb().then(function (c) {
           return c.auth.signInWithOAuth({ provider: 'google',
-            options: { redirectTo: location.origin + '/' + lang + '/compte.html' } }).then(check);
+            options: { redirectTo: location.origin + (back || '/' + lang + '/compte.html') } }).then(check);
         });
       },
       update: function (patch) {
@@ -336,6 +419,36 @@
       },
       confirm: function (params) {
         return sb().then(function (c) { return c.functions.invoke('confirm-payment', { body: params }); });
+      },
+      // Fonction « member » (parrainage, activité du jour, cadeaux, notifications) ; l'erreur garde son code
+      member: function (body) { return Real.fn('member', body); },
+      fn: function (name, body) {
+        return sb().then(function (c) { return c.functions.invoke(name, { body: body }); }).then(function (r) {
+          if (!r.error) return r.data;
+          var ctx = r.error.context;
+          var fail = function (code) { var e = new Error(code || 'error'); e.code = code; throw e; };
+          if (ctx && ctx.json) return ctx.json().then(function (d) { fail(d && d.error); }, function () { fail('server'); });
+          fail('server');
+        });
+      },
+      rewards: function () {
+        return sb().then(function (c) {
+          return c.from('rewards').select('id,kind,plan,days,amount,source,note,status,created_at,expires_at,claimed_at,used_at')
+            .order('created_at', { ascending: false }).limit(60);
+        }).then(check).then(function (r) { return r.data || []; });
+      },
+      useBonus: function (slug) {
+        return sb().then(function (c) { return c.rpc('use_bonus_analysis', { p_match: slug }); }).then(check).then(function (r) {
+          var row = (r.data && r.data[0]) || {};
+          var s = clone(state);
+          s.profile.bonus_analyses = row.bonus_analyses || 0;
+          s.profile.extra_matches = row.extra_matches || [];
+          return save(s);
+        });
+      },
+      referral: function () {
+        return sb().then(function (c) { return c.from('settings').select('value').eq('key', 'referral').maybeSingle(); })
+          .then(check).then(function (r) { return r.data && r.data.value; });
       }
     };
     var B = demo ? Demo : Real;
@@ -370,6 +483,8 @@
       on: function (fn, alive) { listeners.push({ fn: fn, alive: alive }); },
       api: B,
       hasToken: hasToken,
+      // Appel d'une fonction Supabase (page d'administration)
+      fn: function (name, body) { return B.fn ? B.fn(name, body) : Promise.reject(new Error('demo')); },
       // En arrière-plan : on rafraîchit le profil (Premium acheté sur un autre appareil, etc.)
       boot: function () {
         if (demo) return;
@@ -774,6 +889,8 @@
       });
       var fav = p.favorite_leagues || [];
       $$('.fav-chip', box).forEach(function (b) { b.setAttribute('aria-pressed', fav.indexOf(b.dataset.league) >= 0); });
+      var adm = box.querySelector('#admin-link');
+      if (adm) adm.hidden = p.role !== 'admin';
     };
     var s0 = Acct.get();
     var returning = /[?&]code=/.test(location.search);
@@ -797,6 +914,7 @@
         api.welcome().catch(noop);
         toast(fmt(T.welcome, { n: (s.user.name || '').split(' ')[0] || '' }));
       }
+      steps = steps.then(function () { return Member.start(true); }).catch(noop);
       var next = local.get('pb-next');
       if (next) { local.del('pb-next'); steps.then(function () { router.go(next); }); }
       return steps;
@@ -910,6 +1028,8 @@
     var methods = scope.querySelector('#pay-methods');
     var secure = scope.querySelector('#pay-secure');
     var plan = 'month';
+    // Paiement en ligne pas encore branché : le bouton ouvre WhatsApp avec un message prêt
+    var wa = payBtn && payBtn.getAttribute('data-wa');
     var names = null;
     try { names = new Intl.DisplayNames([lang], { type: 'region' }); } catch (e) {}
     var countries = Object.keys(P.countries).map(function (c) { return { c: c, n: names ? names.of(c) : c }; });
@@ -944,9 +1064,23 @@
         b.classList.toggle('on', on);
         b.setAttribute('aria-checked', on);
       });
+      if (wa) { payBtn.setAttribute('href', waLink()); return; }
       methods.textContent = methods.dataset[c.provider] || methods.textContent;
       secure.textContent = secure.dataset[c.provider] || secure.textContent;
       payBtn.querySelector('span').textContent = fmt(T.pay_btn, { p: money(c[plan], code, c.decimals) });
+    };
+    var waLink = function () {
+      var code = currencyOf(select.value);
+      var c = P.currencies[code] || {};
+      var b = plansEl.querySelector('.plan[data-plan="' + plan + '"] b');
+      var st = Acct.get();
+      var u = st && st.user;
+      var msg = fmt(T.wa_msg, {
+        plan: b ? b.textContent.trim() : plan,
+        price: c[plan] != null ? money(c[plan], code, c.decimals) : '',
+        who: u ? [u.name, u.email].filter(Boolean).join(' · ') : '—'
+      });
+      return 'https://wa.me/' + wa + '?text=' + encodeURIComponent(msg);
     };
     plansEl.addEventListener('click', function (e) {
       var b = e.target.closest('.plan');
@@ -966,8 +1100,20 @@
     showStatus(s);
     var q = params();
     if (q.paiement === 'annule') { flash(scope, T.pay_cancel, 'warn'); cleanUrl(); }
-    payBtn.addEventListener('click', function () {
+    payBtn.addEventListener('click', function (e) {
       var st = Acct.get();
+      if (wa) {
+        if (!st || !st.user) {
+          e.preventDefault();
+          toast(T.wa_need_signin);
+          local.set('pb-next', location.pathname);
+          router.go('compte.html');
+          return;
+        }
+        payBtn.setAttribute('href', waLink());
+        toast(T.wa_open);
+        return;
+      }
       if (!st || !st.user) {
         toast(T.need_signin);
         local.set('pb-next', location.pathname);
@@ -999,6 +1145,9 @@
       var p = s.profile || {};
       return { m: p.free_day === Free.today() && p.free_match ? p.free_match : null };
     },
+    // Matchs ouverts avec une analyse offerte (parrainage, cadeau), et analyses offertes restantes
+    extra: function () { var s = Acct.get(); return (s && s.user && s.profile && s.profile.extra_matches) || []; },
+    bonus: function () { var s = Acct.get(); return (s && s.user && s.profile && s.profile.bonus_analyses) || 0; },
     // Nom du match choisi (pour le lien « tu l'as utilisée sur … »), gardé sur le téléphone
     name: function (slug, name) {
       if (name) local.set('pb-free-name', JSON.stringify({ m: slug, n: name }));
@@ -1024,14 +1173,21 @@
     var render = function () {
       var f = Free.get();
       var m = f && f.m;
+      var ex = Free.extra();
       $$('a.mcard, a.featured, .pick', scope).forEach(function (a) {
         var link = a.matches('a') ? a : a.querySelector('a.pk-main');
-        a.classList.toggle('free-ok', !!m && !!link && slugOf(link.getAttribute('href')) === m);
+        var sl = link && slugOf(link.getAttribute('href'));
+        a.classList.toggle('free-ok', !!sl && ((!!m && sl === m) || ex.indexOf(sl) >= 0));
       });
       if (!card) return;
       var mine = !!m && m === slug;
-      if (app) app.classList.toggle('free-ok', mine);
-      card.dataset.state = !f ? 'signin' : mine ? 'this' : m ? 'used' : 'new';
+      var extra = !mine && !!f && ex.indexOf(slug) >= 0;
+      if (app) app.classList.toggle('free-ok', mine || extra);
+      card.dataset.state = !f ? 'signin' : mine ? 'this' : extra ? 'extra' : m ? 'used' : 'new';
+      var nb = Free.bonus();
+      card.classList.toggle('has-bonus', nb > 0);
+      var left = card.querySelector('[data-bonus-left]');
+      if (left) left.textContent = fmt(nb === 1 ? T.bonus_left1 : T.bonus_leftN, { n: nb });
       if (m && !mine) {
         var a = card.querySelector('[data-free-link]');
         a.textContent = Free.name(m) || T.free_other;
@@ -1044,6 +1200,18 @@
     Acct.on(render, function () { return card ? card.isConnected : scope !== doc && scope.isConnected; });
     if (!card) return;
     card.querySelector('#free-use').addEventListener('click', use);
+    var bonusBtn = card.querySelector('#bonus-use');
+    if (bonusBtn) bonusBtn.addEventListener('click', function () {
+      if (busy) return;
+      busy = true;
+      bonusBtn.disabled = true;
+      Acct.api.useBonus(slug).then(function () {
+        busy = false;
+        bonusBtn.disabled = false;
+        toast(T.bonus_done);
+        render();
+      }, function () { busy = false; bonusBtn.disabled = false; toast(Free.bonus() > 0 ? T.error : T.bonus_none); });
+    });
     card.querySelector('#free-signin').addEventListener('click', function () {
       local.set('pb-free-want', slug);
       local.set('pb-next', location.pathname);
@@ -1067,7 +1235,8 @@
       if (!s || !s.user) return '';
       if (Acct.premium()) return 'p';
       var f = Free.get();
-      return 'f' + (f && f.m ? ':' + f.m : '');
+      var ex = Free.extra();
+      return 'f' + (f && f.m ? ':' + f.m : '') + (ex.length ? '+' + ex.length + ':' + ex[ex.length - 1] : '');
     };
     var json = function (url) {
       var lvl = level();
@@ -1101,6 +1270,11 @@
       var f = Free.get();
       var parts = [json(base + 'free.json').catch(function () { return null; })];
       if (f && f.m) parts.push(json(base + 'm/' + f.m + '.json').catch(function () { return null; }));
+      // Page d'un match ouvert avec une analyse offerte
+      var mm = /^match\/([a-z0-9-]+)$/.exec(pg);
+      if (mm && (!f || mm[1] !== f.m) && Free.extra().indexOf(mm[1]) >= 0) {
+        parts.push(json(base + 'm/' + mm[1] + '.json').catch(function () { return null; }));
+      }
       return Promise.all(parts).then(function (all) {
         var out = { v: null, b: {} };
         all.forEach(function (j) {
@@ -1116,10 +1290,16 @@
       var lvl = level();
       if (lvl === 'p') return json(src);
       var f = Free.get();
-      if (!f || !f.m) return Promise.resolve({ matches: [], limited: lvl ? 'none' : 'anon' });
-      return json('/lk/' + lang + '/m/' + f.m + '.json').then(function (j) {
-        return { matches: j.tk ? [j.tk] : [], limited: 'free' };
-      }, function () { return { matches: [], limited: 'none' }; });
+      // Le match du jour et les 10 derniers matchs ouverts avec une analyse offerte (ceux déjà joués n'existent plus)
+      var slugs = (f && f.m ? [f.m] : []).concat(Free.extra().slice(-10).reverse())
+        .filter(function (x, i, a) { return a.indexOf(x) === i; });
+      if (!slugs.length) return Promise.resolve({ matches: [], limited: lvl ? 'none' : 'anon' });
+      return Promise.all(slugs.map(function (sl) {
+        return json('/lk/' + lang + '/m/' + sl + '.json').then(function (j) { return j.tk || null; }, function () { return null; });
+      })).then(function (all) {
+        var ms = all.filter(Boolean);
+        return { matches: ms, limited: ms.length ? 'free' : 'none' };
+      });
     };
     var marks = function (root) {
       var out = [];
@@ -1799,6 +1979,302 @@
     Acct.on(function () { renderMine(); if (mode !== 'mine' && Acct.premium()) prepAuto(); }, alive);
   };
 
+
+  // =====================================================================================================
+  // Membre : jour d'utilisation et parrainage (une fois par jour), récompenses, invitation, notifications
+  // =====================================================================================================
+  // Code d'un lien d'invitation (/i/CODE), gardé 7 jours sur le téléphone jusqu'à la création du compte
+  var refCode = function () {
+    try {
+      var o = JSON.parse(local.get('pb-ref') || 'null');
+      if (o && o.c && Date.now() - o.t < 7 * 864e5) return o.c;
+    } catch (e) {}
+    return null;
+  };
+  var Member = {
+    start: function (force) {
+      var s = Acct.get();
+      if (!s || !s.user || Acct.demo || !Acct.api.member) return Promise.resolve();
+      var code = refCode();
+      var key = s.user.id + ':' + dayKey(new Date());
+      if (!force && !code && local.get('pb-start') === key) return Promise.resolve();
+      local.set('pb-start', key);
+      return Acct.api.member({ action: 'start', day: dayKey(new Date()), code: code || undefined }).then(function (r) {
+        if (code) {
+          local.del('pb-ref');
+          if (r && r.rewards) toast(T.ref_ok);
+        }
+        if (r && r.rewards) Rw.badge(null);
+      }, function () { local.del('pb-start'); });
+    }
+  };
+
+  // Récompenses : liste, activation, pastille de l'onglet
+  var Rw = {
+    label: function (r) {
+      if (r.kind === 'premium') return fmt(T.rw_premium, { d: (T.rw_dur || {})[r.plan] || '' });
+      return fmt(r.amount === 1 ? T.rw_an1 : T.rw_anN, { n: r.amount });
+    },
+    // Nombre de récompenses à activer (null : à recalculer), affiché sur l'onglet « Récompenses »
+    badge: function (n) {
+      if (n === null) {
+        local.del('pb-rw-n');
+        if (Acct.get() && Acct.get().user) Acct.api.rewards().then(function (l) {
+          Rw.badge(l.filter(function (r) { return r.status === 'available'; }).length);
+        }, noop);
+        return;
+      }
+      if (n !== undefined) local.set('pb-rw-n', String(n));
+      var v = +(local.get('pb-rw-n') || 0);
+      var signed = !!(Acct.get() && Acct.get().user);
+      $$('[data-rw-badge]').forEach(function (b) { b.hidden = !signed || !v; b.textContent = v > 9 ? '9+' : String(v); });
+    }
+  };
+
+  var initRewards = function (scope) {
+    var box = scope.querySelector('#rw');
+    if (!box) return;
+    var api = Acct.api;
+    var q = params();
+    if (q.r && q.t) {
+      local.set('pb-claim', JSON.stringify({ r: q.r, t: q.t }));
+      cleanUrl();
+    }
+    var pendingClaim = function () { try { return JSON.parse(local.get('pb-claim') || 'null'); } catch (e) { return null; } };
+    var cfgRef = {};
+    try { cfgRef = JSON.parse(scope.querySelector('#pb-ref-cfg').textContent); } catch (e) {}
+    var icon = function (kind) { var t = scope.querySelector('#rw-ic-' + kind); return t ? t.innerHTML : ''; };
+    var list = [];
+    var busy = false;
+
+    var item = function (r) {
+      var el = doc.createElement('article');
+      el.className = 'rw-item ' + r.kind + ' st-' + r.status;
+      var when = r.status === 'used' && r.used_at ? fmt(T.rw_used, { d: F.date.format(new Date(r.used_at)) })
+        : r.status === 'expired' ? T.rw_expired : r.status === 'cancelled' ? T.rw_cancelled
+          : F.date.format(new Date(r.created_at));
+      el.innerHTML = '<span class="ri-ic" aria-hidden="true">' + icon(r.kind) + '</span>' +
+        '<div class="ri-txt"><b></b><small></small>' + (r.note ? '<q></q>' : '') + '</div>';
+      el.querySelector('b').textContent = Rw.label(r);
+      el.querySelector('small').textContent = ((T.rw_src || {})[r.source] || '') + ' · ' + when;
+      if (r.note) el.querySelector('q').textContent = r.note;
+      if (r.status === 'available') {
+        var b = doc.createElement('button');
+        b.type = 'button';
+        b.className = 'btn ri-go';
+        b.textContent = r.kind === 'premium' ? T.rw_act_premium : T.rw_act_analyses;
+        b.addEventListener('click', function () { activate(r, b); });
+        el.appendChild(b);
+      }
+      return el;
+    };
+    var renderList = function () {
+      var open = list.filter(function (r) { return r.status === 'available'; });
+      var past = list.filter(function (r) { return r.status !== 'available'; });
+      var fill = function (id, rows) {
+        var c = scope.querySelector('#' + id);
+        c.textContent = '';
+        rows.forEach(function (r) { c.appendChild(item(r)); });
+        scope.querySelector('#' + id + '-box').hidden = !rows.length;
+      };
+      fill('rw-waiting', open);
+      fill('rw-history', past);
+      scope.querySelector('#rw-empty').hidden = list.length > 0;
+      var friends = list.filter(function (r) { return r.source === 'referral_signup'; }).length;
+      var cnt = scope.querySelector('#inv-count');
+      cnt.hidden = !friends;
+      cnt.textContent = fmt(friends === 1 ? T.inv_friends1 : T.inv_friendsN, { n: friends });
+      Rw.badge(open.length);
+    };
+    var load = function () {
+      return api.rewards().then(function (l) { list = l; renderList(); }, function () { flash(scope, T.error, 'bad'); });
+    };
+    var activate = function (r, b) {
+      if (busy) return;
+      busy = true;
+      b.disabled = true;
+      api.member({ action: 'activate', id: r.id }).then(function (res) {
+        busy = false;
+        if (res && res.kind === 'premium' && res.premium_until) flash(scope, fmt(T.rw_done_premium, { d: F.date.format(new Date(res.premium_until)) }));
+        else flash(scope, fmt(T.rw_done_analyses, { n: r.amount }));
+        win.scrollTo({ top: 0, behavior: reduced.matches ? 'auto' : 'smooth' });
+        return (Acct.demo ? Promise.resolve() : api.session()).then(load);
+      }).catch(function () { busy = false; b.disabled = false; toast(T.error); });
+    };
+    // Lien de l'e-mail cadeau : on valide, puis le cadeau apparaît dans la liste
+    var claim = function () {
+      var c = pendingClaim();
+      if (!c) return Promise.resolve();
+      flash(scope, T.rw_claim_wait);
+      return api.member({ action: 'claim', id: c.r, token: c.t }).then(function (res) {
+        local.del('pb-claim');
+        flash(scope, res && res.status === 'expired' ? T.rw_claim_expired : T.rw_claim_ok, res && res.status === 'expired' ? 'warn' : undefined);
+      }, function (e) {
+        if (e && e.code === 'other_account') { flash(scope, T.rw_claim_other, 'warn'); return; }
+        local.del('pb-claim');
+        flash(scope, e && (e.code === 'bad_link' || e.code === 'unknown') ? T.rw_claim_bad : T.error, 'warn');
+      });
+    };
+    // Barème du parrainage (réglable dans l'admin) : les chiffres de la page suivent la base
+    var showRef = function (v) {
+      if (!v) return;
+      cfgRef = v;
+      var buy = Object.keys(v.purchase || {}).map(function (k) { return v.purchase[k]; }).filter(function (n) { return n > 0; });
+      var set = function (k, txt) { var el = scope.querySelector('[data-ref="' + k + '"]'); if (el) el.textContent = txt; };
+      set('signup', '+' + v.signup);
+      set('active', '+' + v.active);
+      if (buy.length) set('buy', '+' + Math.min.apply(null, buy) + (lang === 'fr' ? ' à ' : ' to ') + '+' + Math.max.apply(null, buy));
+      var t1 = scope.querySelector('[data-ref-text="active"]');
+      if (t1) t1.textContent = fmt(T.inv_active_js || t1.textContent.replace(/\d+/, '{d}'), { d: v.active_days });
+      var t2 = scope.querySelector('[data-ref-text="welcome"] span');
+      if (t2) t2.textContent = t2.textContent.replace(/\d+/, String(v.welcome));
+      var t3 = scope.querySelector('[data-ref-text="cap"]');
+      if (t3) t3.textContent = t3.textContent.replace(/\d+/, String(v.monthly_cap));
+    };
+    var invite = function (s) {
+      // En démo, un code d'exemple (le vrai est donné par la base à la création du compte)
+      var code = (s.profile && s.profile.ref_code) || (Acct.demo ? 'DEMO23' : null);
+      var url = location.origin + '/i/' + (code || '');
+      var input = scope.querySelector('#inv-url');
+      input.value = code ? url : '…';
+      var msg = fmt(T.inv_msg, { n: cfgRef.welcome || 2, u: url });
+      scope.querySelector('#inv-wa').setAttribute('href', 'https://wa.me/?text=' + encodeURIComponent(msg));
+      var sh = scope.querySelector('#inv-share');
+      sh.hidden = !navigator.share;
+      sh.onclick = function () { navigator.share({ title: 'Probalis', text: msg }).catch(noop); };
+      scope.querySelector('#inv-copy').onclick = function () {
+        var done = function () { toast(T.inv_copied); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { input.select(); });
+        else { input.select(); try { doc.execCommand('copy'); done(); } catch (e) {} }
+      };
+    };
+    var render = function (s) {
+      box.dataset.state = s && s.user ? 'in' : 'out';
+      if (!s || !s.user) {
+        if (pendingClaim()) flash(scope, T.rw_claim_signin, 'warn');
+        return;
+      }
+      scope.querySelector('#rw-bonus').textContent = String((s.profile && s.profile.bonus_analyses) || 0);
+      invite(s);
+    };
+    scope.querySelector('#rw-signin').addEventListener('click', function () { local.set('pb-next', location.pathname); });
+    var first = function (s) {
+      render(s);
+      if (!s || !s.user) return;
+      claim().then(load);
+      api.referral().then(showRef, noop);
+    };
+    var s0 = Acct.get();
+    if (!Acct.demo && Acct.hasToken() && !s0) api.session().then(first, function () { first(Acct.get()); });
+    else first(s0);
+    Acct.on(render, function () { return box.isConnected; });
+  };
+
+  // Page d'invitation (/i/CODE) : le code est gardé jusqu'à la création du compte
+  var initInvite = function (scope) {
+    var box = scope.querySelector('#invp');
+    if (!box) return;
+    var q = params();
+    var code = String(q.c || '').toUpperCase();
+    if (/^[A-Z0-9]{4,12}$/.test(code)) {
+      // Visiteur non francophone : la même invitation en anglais (une seule fois)
+      if (lang === 'fr' && !/^fr/i.test(navigator.language || 'fr') && !session.get('pb-inv-lang')) {
+        session.set('pb-inv-lang', '1');
+        location.replace('/en/invite.html?c=' + code);
+        return;
+      }
+      local.set('pb-ref', JSON.stringify({ c: code, t: Date.now() }));
+      cleanUrl();
+    }
+    var render = function (s) {
+      box.dataset.state = s && s.user ? 'have' : refCode() ? '' : 'bad';
+    };
+    render(Acct.get());
+    Acct.on(render, function () { return box.isConnected; });
+    scope.querySelector('#invp-go').addEventListener('click', function () {
+      local.set('pb-next', '/' + lang + '/recompenses.html');
+    });
+  };
+
+  // Notifications : abonnement de ce téléphone (clé publique demandée à la fonction « member »)
+  var Push = {
+    ok: function () { return 'serviceWorker' in navigator && 'PushManager' in win && 'Notification' in win; },
+    key: function (b64) {
+      var pad = '='.repeat((4 - b64.length % 4) % 4);
+      var raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+      var out = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+      return out;
+    },
+    current: function () {
+      if (!Push.ok()) return Promise.resolve(null);
+      return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).catch(function () { return null; });
+    },
+    enable: function () {
+      return Notification.requestPermission().then(function (perm) {
+        if (perm !== 'granted') { var e = new Error('denied'); e.code = 'denied'; throw e; }
+        return Promise.all([navigator.serviceWorker.ready, Acct.api.member({ action: 'push_key' })]);
+      }).then(function (a) {
+        var reg = a[0];
+        var key = a[1] && a[1].key;
+        if (!key) throw new Error('key');
+        return reg.pushManager.getSubscription().then(function (old) {
+          // Abonnement fait avec une autre clé : on le refait
+          if (old && local.get('pb-push-key') === key) return old;
+          return (old ? old.unsubscribe() : Promise.resolve()).then(function () {
+            return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Push.key(key) });
+          });
+        }).then(function (sub) {
+          local.set('pb-push-key', key);
+          return Acct.api.member({ action: 'push_sub', sub: sub.toJSON(), lang: lang });
+        });
+      });
+    },
+    disable: function () {
+      return Push.current().then(function (sub) {
+        if (!sub) return;
+        var ep = sub.endpoint;
+        return sub.unsubscribe().then(function () { return Acct.api.member({ action: 'push_unsub', endpoint: ep }).catch(noop); });
+      });
+    }
+  };
+  var initPush = function (scope) {
+    var card = scope.querySelector('#push-card');
+    if (!card) return;
+    var dev = card.querySelector('#push-device');
+    var ua = navigator.userAgent || '';
+    var ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var standalone = (win.matchMedia && win.matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+    var set = function (st) { card.dataset.state = st; dev.checked = st === 'on'; };
+    if (Acct.demo) {
+      set(local.get('pb-demo-push') ? 'on' : 'off');
+      dev.addEventListener('change', function () {
+        if (dev.checked) local.set('pb-demo-push', '1'); else local.del('pb-demo-push');
+        set(dev.checked ? 'on' : 'off');
+        toast(dev.checked ? T.push_on : T.push_off);
+      });
+      return;
+    }
+    if (!Push.ok()) { set(ios && !standalone ? 'ios' : 'unsupported'); return; }
+    if (Notification.permission === 'denied') set('blocked');
+    else Push.current().then(function (sub) { set(sub ? 'on' : 'off'); });
+    dev.addEventListener('change', function () {
+      dev.disabled = true;
+      var want = dev.checked;
+      (want ? Push.enable() : Push.disable()).then(function () {
+        dev.disabled = false;
+        set(want ? 'on' : 'off');
+        toast(want ? T.push_on : T.push_off);
+        if (want) Acct.api.member({ action: 'push_test' }).catch(noop);
+      }, function (e) {
+        dev.disabled = false;
+        if (e && e.code === 'denied') { set('blocked'); toast(T.push_blocked); return; }
+        set(want ? 'off' : 'on');
+        toast(T.error);
+      });
+    });
+  };
+
   var init = function (scope) {
     initDates(scope);
     initImages(scope);
@@ -1809,10 +2285,15 @@
     initAccount(scope);
     initPremium(scope);
     initFree(scope);
+    initRewards(scope);
+    initInvite(scope);
+    initPush(scope);
     initBets(scope);
     initMatchAdd(scope);
     initTicket(scope);
     Coupon.badge();
+    Rw.badge();
+    Member.start(false);
   };
 
   // =====================================================================================================
@@ -1834,6 +2315,8 @@
       if (u.origin !== location.origin) return null;
       if (!/(\.html|\/)$/.test(u.pathname)) return null;
       if (u.pathname.split('/')[1] !== lang) return null;  // autre langue : chargement complet
+      // Probalis Office (appli à part : styles, script et manifeste) : on en sort par un chargement complet
+      if (/^\/office\//.test(location.pathname)) return null;
       return { key: u.pathname + u.search, url: u };
     };
     var linkOf = function (e) {
@@ -2048,11 +2531,13 @@
     return { start: start, go: go, reload: reload };
   })();
 
+  win.Probalis = { acct: Acct, toast: toast, fmt: fmt, money: money, esc: esc, F: F, T: T, CFG: CFG, P: P, local: local,
+    session: session, params: params, cleanUrl: cleanUrl, reduced: reduced };
   router.start();
   Lk.boot(function () { init(doc); });
   Acct.boot();
 
-  // ---------- Application installable et utilisable hors connexion ----------
+  // ---------- Application installable (elle a besoin d'Internet : rien n'est gardé pour le mode hors connexion) ----------
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     win.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(noop); });
   }

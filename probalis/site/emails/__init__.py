@@ -1,4 +1,6 @@
-"""E-mails Probalis (envoyés par Resend) : bienvenue, reçu d'achat, rappel avant la fin du Premium, grand choc demain.
+"""E-mails Probalis : bienvenue, reçu d'achat, rappel avant la fin du Premium, grand choc demain, cadeau de l'admin,
+récompense du parrainage et Premium activé. Envoyés par Gmail (programme Google Apps Script, voir gmail_script.js)
+ou par Resend, selon les secrets enregistrés.
 
 Une seule source pour les modèles : ce fichier + layout.html. La commande
     python -m probalis.site.emails generate
@@ -23,7 +25,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 SHARED = ROOT / "supabase" / "functions" / "_shared"
 PREVIEWS = ROOT / "docs" / "emails"
-KINDS = ("welcome", "receipt", "expiry", "big_match")
+KINDS = ("welcome", "receipt", "expiry", "big_match", "gift", "reward", "premium_on")
 LANGS = ("fr", "en")
 
 _P = 'style="margin:0 0 14px;"'
@@ -70,7 +72,8 @@ TEXTS = {
             "body": [
                 "Probalis calcule la vraie chance de chaque pari, à partir des cotes du marché et de nos modèles statistiques. Pas de « coup sûr », pas de « pari en or » : juste des chiffres honnêtes pour décider en connaissance de cause.",
                 "<b>Pour bien démarrer :</b><br>• Chaque jour, tu as droit à 1 analyse complète gratuite : ouvre le match de ton choix et débloque-la.<br>• Utilise « Compare ta cote » : entre la cote de ton bookmaker, on te dit si c'est un bon prix.<br>• Active les alertes des grands chocs dans <a href=\"{{account_url}}\" style=\"color:#15803D;font-weight:700;\">Mon compte</a> : un e-mail la veille des plus belles affiches.",
-                "Envie d'aller plus loin ? <a href=\"{{premium_url}}\" style=\"color:#15803D;font-weight:700;\">Premium</a> débloque l'analyse de tous les matchs, sans pub, avec un pass de 7 ou 30 jours, sans abonnement.",
+                "Invite tes amis avec ton lien : chaque ami inscrit te rapporte des <b>analyses offertes</b>, à utiliser sur les matchs de ton choix. Tu le trouves dans <a href=\"{{rewards_url}}\" style=\"color:#15803D;font-weight:700;\">Récompenses</a>.",
+                "Envie d'aller plus loin ? <a href=\"{{premium_url}}\" style=\"color:#15803D;font-weight:700;\">Premium</a> débloque l'analyse de tous les matchs, sans pub, avec un pass de 7 jours à 1 an, sans abonnement.",
             ],
             "cta": "Voir les matchs du jour", "cta_url": "{{home_url}}", "unsubscribe": False, "reason": "reason_account",
         },
@@ -110,6 +113,42 @@ TEXTS = {
                      "Plus de 2,5 buts : {{over25}} · Les deux équipes marquent : {{btts}}"],
             "cta": "Voir l'analyse complète", "cta_url": "{{match_url}}", "unsubscribe": True, "reason": "reason_news",
         },
+        "gift": {
+            "subject": "{{name}}, un cadeau t'attend sur Probalis : {{gift}}",
+            "preheader": "Touche « Activer la récompense » pour le recevoir sur ton compte.",
+            "kicker": "Cadeau", "title": "Un cadeau pour toi, {{name}} !",
+            "body": [
+                "L'équipe Probalis t'offre un cadeau : <b>{{gift}}</b>.",
+                "{{{note_html}}}",
+                "Touche le bouton ci-dessous pour activer ta récompense. Elle arrivera dans l'onglet <b>Récompenses</b> de ton compte : tu pourras l'utiliser quand tu veux.",
+                "Ce lien est valable jusqu'au {{expires}}. Si tu n'es pas connecté, Probalis te demandera d'abord de te connecter avec le compte Google qui reçoit cet e-mail.",
+            ],
+            "text": ["L'équipe Probalis t'offre un cadeau : {{gift}}.", "{{note}}",
+                     "Active ta récompense avec ce lien (valable jusqu'au {{expires}}) : elle arrivera dans l'onglet Récompenses de ton compte."],
+            "cta": "Activer la récompense", "cta_url": "{{claim_url}}", "unsubscribe": False, "reason": "reason_account",
+        },
+        "reward": {
+            "subject": "+{{amount}} analyses offertes sur Probalis",
+            "preheader": "{{why}}",
+            "kicker": "Parrainage", "title": "Bravo {{name}} : +{{amount}} analyses offertes",
+            "body": [
+                "{{why}}",
+                "Tes <b>{{amount}} analyses offertes</b> t'attendent dans l'onglet Récompenses de ton compte. Active-les, puis utilise-les sur les matchs de ton choix : chaque analyse offerte ouvre l'analyse complète d'un match.",
+                "Continue d'inviter avec ton lien : <a href=\"{{invite_url}}\" style=\"color:#15803D;font-weight:700;\">{{invite_url}}</a>",
+            ],
+            "cta": "Voir mes récompenses", "cta_url": "{{rewards_url}}", "unsubscribe": False, "reason": "reason_account",
+        },
+        "premium_on": {
+            "subject": "Ton Premium est activé jusqu'au {{until}}",
+            "preheader": "Ton cadeau ({{gift}}) est activé sur ton compte.",
+            "kicker": "Premium activé", "title": "C'est parti, {{name}} : ton Premium est actif !",
+            "body": [
+                "Ton cadeau, <b>{{gift}}</b>, vient d'être ajouté à ton compte.",
+                _table([("Offre", "{{gift}}"), ("Premium actif jusqu'au", "{{until}}")]),
+                "Profite de l'analyse de tous les matchs, des 5 paris de chaque niveau et des coupons du jour, sans pub. Rien ne sera prélevé à la fin.",
+            ],
+            "cta": "Voir les matchs du jour", "cta_url": "{{home_url}}", "unsubscribe": False, "reason": "reason_account",
+        },
     },
     "en": {
         "responsible": "18+ · Probabilities are not certainties. Never stake more than you can afford to lose.",
@@ -124,7 +163,8 @@ TEXTS = {
             "body": [
                 "Probalis works out the real chance of every bet from market odds and our statistical models. No \"sure bets\", no \"golden tips\": just honest numbers so you can decide with full knowledge.",
                 "<b>Getting started:</b><br>• Every day you get 1 free full analysis: open the match of your choice and unlock it.<br>• Use \"Check your odds\": enter your bookmaker's price and we tell you if it's a good one.<br>• Turn on big-match alerts in <a href=\"{{account_url}}\" style=\"color:#15803D;font-weight:700;\">My account</a>: an email the day before the biggest matches.",
-                "Want more? <a href=\"{{premium_url}}\" style=\"color:#15803D;font-weight:700;\">Premium</a> unlocks the analysis of every match, ad-free, with a 7- or 30-day pass and no subscription.",
+                "Invite your friends with your link: every friend who signs up earns you <b>free analyses</b> to use on the matches you choose. You'll find it in <a href=\"{{rewards_url}}\" style=\"color:#15803D;font-weight:700;\">Rewards</a>.",
+                "Want more? <a href=\"{{premium_url}}\" style=\"color:#15803D;font-weight:700;\">Premium</a> unlocks the analysis of every match, ad-free, with a pass from 7 days to 1 year and no subscription.",
             ],
             "cta": "See today's matches", "cta_url": "{{home_url}}", "unsubscribe": False, "reason": "reason_account",
         },
@@ -164,6 +204,42 @@ TEXTS = {
                      "Over 2.5 goals: {{over25}} · Both teams to score: {{btts}}"],
             "cta": "See the full analysis", "cta_url": "{{match_url}}", "unsubscribe": True, "reason": "reason_news",
         },
+        "gift": {
+            "subject": "{{name}}, a gift is waiting for you on Probalis: {{gift}}",
+            "preheader": "Tap “Activate the reward” to get it on your account.",
+            "kicker": "Gift", "title": "A gift for you, {{name}}!",
+            "body": [
+                "The Probalis team is giving you a gift: <b>{{gift}}</b>.",
+                "{{{note_html}}}",
+                "Tap the button below to activate your reward. It will appear in the <b>Rewards</b> tab of your account: use it whenever you like.",
+                "This link is valid until {{expires}}. If you're not signed in, Probalis will first ask you to sign in with the Google account that receives this email.",
+            ],
+            "text": ["The Probalis team is giving you a gift: {{gift}}.", "{{note}}",
+                     "Activate your reward with this link (valid until {{expires}}): it will appear in the Rewards tab of your account."],
+            "cta": "Activate the reward", "cta_url": "{{claim_url}}", "unsubscribe": False, "reason": "reason_account",
+        },
+        "reward": {
+            "subject": "+{{amount}} free analyses on Probalis",
+            "preheader": "{{why}}",
+            "kicker": "Referral", "title": "Well done {{name}}: +{{amount}} free analyses",
+            "body": [
+                "{{why}}",
+                "Your <b>{{amount}} free analyses</b> are waiting in the Rewards tab of your account. Activate them, then use them on the matches you choose: each free analysis opens the full analysis of one match.",
+                "Keep inviting with your link: <a href=\"{{invite_url}}\" style=\"color:#15803D;font-weight:700;\">{{invite_url}}</a>",
+            ],
+            "cta": "See my rewards", "cta_url": "{{rewards_url}}", "unsubscribe": False, "reason": "reason_account",
+        },
+        "premium_on": {
+            "subject": "Your Premium is on until {{until}}",
+            "preheader": "Your gift ({{gift}}) is now on your account.",
+            "kicker": "Premium on", "title": "Here we go, {{name}}: your Premium is active!",
+            "body": [
+                "Your gift, <b>{{gift}}</b>, has just been added to your account.",
+                _table([("Plan", "{{gift}}"), ("Premium active until", "{{until}}")]),
+                "Enjoy the analysis of every match, all 5 bets of each level and today's accumulators, ad-free. Nothing will be charged at the end.",
+            ],
+            "cta": "See today's matches", "cta_url": "{{home_url}}", "unsubscribe": False, "reason": "reason_account",
+        },
     },
 }
 
@@ -178,7 +254,8 @@ def _env() -> Environment:
 
 
 def _text(s: str) -> str:
-    s = re.sub(r'<a [^>]*href="([^"]+)"[^>]*>(.*?)</a>', r"\2 (\1)", s)
+    s = re.sub(r'<a [^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+               lambda m: m.group(2) if m.group(2) == m.group(1) else f"{m.group(2)} ({m.group(1)})", s)
     s = re.sub(r"<br\s*/?>", "\n", s)
     s = re.sub(r"</tr>", "\n", s)
     s = re.sub(r"</div>", " ", s)
@@ -238,18 +315,25 @@ SAMPLES = {
     "fr": {"name": "Awa", "plan": "Pass 30 jours", "amount": "3 000 FCFA", "provider": "Mobile money (Flutterwave)",
            "date": "19 novembre 2026", "ref": "PB-4F2A9C", "until": "19 décembre 2026",
            "home": "Arsenal", "away": "Borussia Dortmund", "league": "Ligue des champions", "kickoff": "mardi 24 nov. à 21:00",
-           "p1": "56 %", "px": "23 %", "p2": "21 %", "over25": "58 %", "btts": "55 %"},
+           "p1": "56 %", "px": "23 %", "p2": "21 %", "over25": "58 %", "btts": "55 %",
+           "gift": "Pass Premium 30 jours", "expires": "20 décembre 2026", "claim_url": "#", "amount": "3",
+           "note": "Merci de faire partie des premiers membres !",
+           "why": "Ton ami Paul a utilisé Probalis 3 jours différents.", "invite_url": "https://probalis.pages.dev/i/K7M2QX"},
     "en": {"name": "Awa", "plan": "30-day pass", "amount": "€7.99", "provider": "Card (Stripe)",
            "date": "19 November 2026", "ref": "PB-4F2A9C", "until": "19 December 2026",
            "home": "Arsenal", "away": "Borussia Dortmund", "league": "Champions League", "kickoff": "Tue 24 Nov, 21:00",
-           "p1": "56%", "px": "23%", "p2": "21%", "over25": "58%", "btts": "55%"},
+           "p1": "56%", "px": "23%", "p2": "21%", "over25": "58%", "btts": "55%",
+           "gift": "30-day Premium pass", "expires": "20 December 2026", "claim_url": "#", "amount": "3",
+           "note": "Thanks for being one of our first members!",
+           "why": "Your friend Paul has used Probalis on 3 different days.", "invite_url": "https://probalis.pages.dev/i/K7M2QX"},
 }
 
 
 def links(site: str, lang: str) -> dict:
     """Liens communs à tous les e-mails."""
     return {"site_url": site, "home_url": f"{site}/{lang}/", "account_url": f"{site}/{lang}/compte.html",
-            "premium_url": f"{site}/{lang}/premium.html", "responsible_url": f"{site}/{lang}/jeu-responsable.html"}
+            "premium_url": f"{site}/{lang}/premium.html", "responsible_url": f"{site}/{lang}/jeu-responsable.html",
+            "rewards_url": f"{site}/{lang}/recompenses.html"}
 
 
 def generate() -> None:
@@ -267,7 +351,8 @@ def generate() -> None:
             v = {**SAMPLES[lang], **links(site, lang), "unsubscribe_url": "#",
                  "home_logo": f"{site}/icons/icone-192.png", "away_logo": f"{site}/icons/icone-192.png",
                  "others_html": others_html([("Real Madrid – Liverpool", "Ligue des champions" if lang == "fr"
-                                              else "Champions League", "21:00")], lang)}
+                                              else "Champions League", "21:00")], lang),
+                 "note_html": note_html(SAMPLES[lang]["note"])}
             if kind == "big_match" and data:
                 picks = daily.big_matches(data, None)
                 if picks:
@@ -294,3 +379,12 @@ def others_html(items: list[tuple[str, str, str]], lang: str) -> str:
                   for m, lg, ko in items)
     return (f'<p style="margin:18px 0 6px;font-weight:700;">{OTHERS_TITLE[lang]}</p>'
             f'<ul style="margin:0;padding-left:18px;color:#5B6B82;font-size:14px;">{lis}</ul>')
+
+
+def note_html(note: str | None) -> str:
+    """Petit mot de l'admin dans l'e-mail cadeau (texte protégé ici, inséré tel quel dans le modèle)."""
+    note = (note or "").strip()
+    if not note:
+        return ""
+    return ('<p style="margin:0 0 14px;padding:12px 14px;background:#F0FDF4;border-left:3px solid #22C55E;'
+            f'border-radius:8px;font-style:italic;">« {html.escape(note)} »</p>')
