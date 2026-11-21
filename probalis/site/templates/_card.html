@@ -1,4 +1,4 @@
-{% macro crest(c, size='', big=false, eager=false) %}<span class="crest{% if size %} {{ size }}{% endif %}{% if not c.img %} noimg{% endif %}" style="--crest: {{ c.color }}" data-initials="{{ c.initials }}">{% if c.img %}<img src="{{ c.img_lg if big else c.img }}" alt=""{% if not eager %} loading="lazy"{% endif %} decoding="async" referrerpolicy="no-referrer">{% endif %}</span>{% endmacro %}
+{% macro crest(c, size='', big=false, eager=false) %}<span class="crest{% if size %} {{ size }}{% endif %}{% if not c.img %} noimg{% endif %}{% if c.dark %} ondark{% endif %}" style="--crest: {{ c.color }}" data-initials="{{ c.initials }}">{% if c.img %}<img src="{{ c.img_lg if big else c.img }}" alt=""{% if not eager %} loading="lazy"{% endif %} decoding="async" referrerpolicy="no-referrer">{% endif %}</span>{% endmacro %}
 
 {% macro league_logo(lg, size='') %}<span class="lgl{% if size %} {{ size }}{% endif %}{% if not lg.logo %} noimg{% endif %}{% if lg.on_dark %} ondark{% endif %}" data-initials="{{ lg.initials }}">{% if lg.logo %}<img src="{{ lg.logo }}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">{% endif %}</span>{% endmacro %}
 

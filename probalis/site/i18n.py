@@ -35,7 +35,8 @@ UI = {
         "updated": "Mis à jour le",
         "theme": "Changer de thème", "lang_switch": "English", "lang_version": "English version",
         "groups": {"main": "Principaux", "goals": "Buts", "teams": "Équipes", "handicaps": "Handicaps",
-                   "scores": "Score exact", "halves": "Mi-temps", "combos": "Combinés"},
+                   "scores": "Score exact", "halves": "Mi-temps", "combos": "Combinés",
+                   "corners": "Corners & cartons"},
         # Accueil
         "nav_label": "Navigation principale", "site_link": "Découvrir Probalis",
         "this_week": "Cette semaine", "matches_title": "Les matchs du jour", "choose_day": "Choisir le jour",
@@ -43,6 +44,7 @@ UI = {
         "leagues_filter": "Choisir les championnats", "reset": "Réinitialiser",
         "search_league": "Rechercher un championnat ou un pays",
         "sec_popular": "Les plus suivis", "sec_europe": "Coupes d'Europe", "sec_others": "Autres championnats",
+        "sec_lower": "Divisions inférieures",
         "sec_women": "Féminin",
         "n_matches": "{n} matchs", "one_match": "1 match", "no_match_week": "Pas de match cette semaine",
         "see_all": "Tout voir", "featured": "À la une", "vs": "VS",
@@ -104,7 +106,8 @@ UI = {
         "updated": "Updated",
         "theme": "Switch theme", "lang_switch": "Français", "lang_version": "Version française",
         "groups": {"main": "Main", "goals": "Goals", "teams": "Teams", "handicaps": "Handicaps",
-                   "scores": "Correct score", "halves": "Halves", "combos": "Combos"},
+                   "scores": "Correct score", "halves": "Halves", "combos": "Combos",
+                   "corners": "Corners & cards"},
         # Home
         "nav_label": "Main navigation", "site_link": "About Probalis",
         "this_week": "This week", "matches_title": "Matches of the day", "choose_day": "Pick a day",
@@ -112,6 +115,7 @@ UI = {
         "leagues_filter": "Choose competitions", "reset": "Reset",
         "search_league": "Search a competition or country",
         "sec_popular": "Most followed", "sec_europe": "European cups", "sec_others": "Other leagues",
+        "sec_lower": "Lower divisions",
         "sec_women": "Women",
         "n_matches": "{n} matches", "one_match": "1 match", "no_match_week": "No match this week",
         "see_all": "See all", "featured": "Featured", "vs": "VS",
@@ -206,7 +210,7 @@ def weekday_short(d, lang: str) -> str:
 def day_med(d, lang: str) -> str:
     return f"{_WEEKDAYS[lang][d.weekday()]} {d.day} {_MONTHS[lang][d.month - 1]}"
 
-GROUP_ORDER = ("main", "goals", "teams", "halves", "handicaps", "scores", "combos")
+GROUP_ORDER = ("main", "goals", "teams", "corners", "halves", "handicaps", "scores", "combos")
 
 
 def num(x: float, lang: str, digits: int = 2) -> str:
@@ -276,6 +280,14 @@ def market_title(key: str, line: float | None, lang: str, home: str, away: str) 
         "score_both_halves2": (f"{away} marque dans les deux mi-temps", f"{away} to score in both halves"),
         "both_halves_over": (f"Plus de {L} but(s) dans chaque mi-temps", f"Over {L} goals in both halves"),
         "both_halves_under": (f"Moins de {L} but(s) dans chaque mi-temps", f"Under {L} goals in both halves"),
+        "co": (f"Corners : plus / moins de {L}", f"Corners: over / under {L}"),
+        "co1x2": ("Équipe qui obtient le plus de corners", "Team with the most corners"),
+        "cot1": (f"Corners de {home} : plus / moins de {L}", f"{home} corners: over / under {L}"),
+        "cot2": (f"Corners de {away} : plus / moins de {L}", f"{away} corners: over / under {L}"),
+        "ca": (f"Cartons : plus / moins de {L}", f"Cards: over / under {L}"),
+        "ca1x2": ("Équipe qui reçoit le plus de cartons", "Team with the most cards"),
+        "cat1": (f"Cartons de {home} : plus / moins de {L}", f"{home} cards: over / under {L}"),
+        "cat2": (f"Cartons de {away} : plus / moins de {L}", f"{away} cards: over / under {L}"),
     }
     for half, (fr_h, en_h) in (("1h", ("1re mi-temps", "1st half")), ("2h", ("2e mi-temps", "2nd half"))):
         t[f"1x2_{half}"] = (f"{fr_h} : résultat", f"{en_h}: result")
@@ -792,7 +804,7 @@ _BETS = {
         "hist_calib": "Annoncé {a} → réel {r}", "hist_too_few": "Pas encore assez de paris réglés pour juger : il en faut au moins 30 par niveau.",
         "hist_days": "Jour par jour", "hist_coupons": "Coupons du jour", "hist_pending": "en attente",
         "sim_title": "Simulation sur la saison 2025/26",
-        "sim_lead": "Les mêmes règles appliquées après coup à toute la saison 2025/26 ({n} matchs, 10 championnats), sans connaître les résultats à l'avance. C'est une simulation, pas un historique réel.",
+        "sim_lead": "Les mêmes règles appliquées après coup à toute la saison 2025/26 ({n} matchs, {leagues} championnats), sans connaître les résultats à l'avance. C'est une simulation, pas un historique réel.",
         "sim_rate": "{r} de réussite pour {a} annoncés ({n} paris)",
         "sim_coupon": "Coupon cote ≈ {t} : {r} de réussite pour {a} annoncés ({n} coupons)",
         "sim_roi": "Gain ou perte à la cote estimée du bookmaker : {r}",
@@ -850,7 +862,7 @@ _BETS = {
         "hist_calib": "Announced {a} → actual {r}", "hist_too_few": "Not enough settled bets to judge yet: we need at least 30 per level.",
         "hist_days": "Day by day", "hist_coupons": "Accumulators of the day", "hist_pending": "pending",
         "sim_title": "Simulation on the 2025/26 season",
-        "sim_lead": "The same rules applied afterwards to the whole 2025/26 season ({n} matches, 10 leagues), without knowing the results in advance. It's a simulation, not a real track record.",
+        "sim_lead": "The same rules applied afterwards to the whole 2025/26 season ({n} matches, {leagues} leagues), without knowing the results in advance. It's a simulation, not a real track record.",
         "sim_rate": "{r} won for {a} announced ({n} bets)",
         "sim_coupon": "Accumulator at odds ≈ {t}: {r} won for {a} announced ({n} accas)",
         "sim_roi": "Profit or loss at the estimated bookmaker odds: {r}",
@@ -915,9 +927,109 @@ _BETS_JS = {
     },
 }
 
+# --- Verdicts, « pourquoi », corners et cartons, historique des analyses (ajoutés le 21/11/2026) ----------
+_V2 = {
+    "fr": {
+        "corners_word": "corners", "cards_word": "cartons", "more_corners": "Plus de corners",
+        "more_cards": "Plus de cartons", "equal_word": "{what} : égalité",
+        "vd_title": "Verdicts", "vd_lead": "Oui ou non, et la chance que la réponse soit la bonne.",
+        "vd_best": "Le plus sûr", "vd_yes": "OUI", "vd_no": "NON", "vd_open": "SERRÉ",
+        "vd_open_help": "Trop serré pour trancher : ni oui ni non à plus de 55 %.",
+        "vd_proof": "Ce type de verdict s'est vérifié {won} fois sur {n} ({rate}) sur la saison {season}, testée sans que le moteur l'ait vue.",
+        "vd_proof_none": "Aucun verdict n'est une certitude : sur 10 verdicts à {pct}, environ {miss} ne passent pas.",
+        "vd_note": "Le pourcentage est la chance que la réponse (OUI ou NON) soit la bonne. Jamais une certitude.",
+        "vd_q_win": "{team} gagne ?", "vd_q_dc": "{sel} ?", "vd_q_ou": "Plus de {line} buts ?",
+        "vd_q_btts": "Les deux équipes marquent ?", "vd_q_tt": "{team} marque ?",
+        "vd_q_co": "Plus de {line} corners ?", "vd_q_ca": "Plus de {line} cartons ?",
+        "vd_partial": "Corners et cartons estimés à partir du championnat de chaque club (un des deux sans données : estimation moins sûre).",
+        "why_title": "Pourquoi", "why_lead": "Les raisons de cette analyse, en buts attendus.",
+        "counts_none": "Pas de chiffres de corners ni de cartons gratuits pour cette compétition.",
+        "counts_none_cup": "Pas de corners ni de cartons pour ce match : aucun des deux clubs n'a de chiffres gratuits dans son championnat.",
+        "counts_title": "Corners et cartons attendus",
+        "counts_line": "{h} – {a} corners · {ch} – {ca} cartons",
+        # Historique des analyses
+        "ha_title": "Analyses des derniers jours", "ha_lead": "Chaque match analysé, son score final et ses verdicts : justes ou faux.",
+        "ha_yesterday": "Hier", "ha_before": "Avant-hier", "ha_week": "7 derniers jours",
+        "ha_none": "Pas encore d'analyse terminée pour ce jour.",
+        "ha_day": "{won} verdicts justes sur {n} ({rate}) pour {ann} annoncés",
+        "ha_best": "Verdict « le plus sûr » : {won} sur {n} ({rate})",
+        "ha_pending": "En attente du résultat", "ha_void": "Match reporté ou annulé",
+        "ha_unverif": "Non vérifiable (pas de chiffres gratuits)",
+        "ha_engine_v1": "Ancien moteur", "ha_open_match": "Voir les verdicts",
+        "ha_past_match": "Ce match est terminé. Voici ce que disait notre analyse.",
+        "rel_title": "Fiabilité vérifiée",
+        "pk_why": "Pourquoi",
+        "rel_tested": "matchs testés sur la saison {season}, que le moteur n'avait jamais vue",
+        "rel_best": "de verdicts « le plus sûr » justes sur ce test ({a} annoncés)",
+        "tk_same_match": "Deux choix viennent du même match : ils sont liés, la vraie chance du ticket peut être différente.",
+        "yesterday_title": "Hier",
+        "yesterday_line": "{won} paris gagnés sur {n} ({rate})",
+        "vd_res_won": "Juste", "vd_res_lost": "Faux", "vd_res_void": "Match reporté ou annulé",
+        "vd_res_nv": "Non vérifiable (pas de chiffres gratuits)",
+        "vd_res_open": "Serré : ne compte pas dans le bilan",
+        "ha_void_short": "Reporté", "ha_ok": "justes", "ha_pending_short": "En attente",
+        "ha_old_day": "Ce jour-là, seules les listes de paris étaient enregistrées (ancien moteur) : pas encore de verdicts par match.",
+        "ha_note": "Chaque verdict est enregistré avant le coup d'envoi, puis jugé avec le score final. Les verdicts « serré » ne comptent pas. Corners et cartons : jugés quand les chiffres sont publiés (2 à 4 jours), non vérifiables pour les coupes.",
+        "ha_past_title": "ce que disait l'analyse", "ha_final": "Match terminé",
+        "ha_said": "Ce que donnait l'analyse", "ha_top_score": "Score le plus probable : {s}",
+        "ha_see_today": "Voir les matchs à venir",
+        "hist_old_engine": "Ancien moteur", "hist_bets_title": "Paris du jour : le bilan",
+        "nf_title": "Page introuvable", "nf_text": "Cette page n'existe pas ou plus. Les matchs terminés sont dans l'historique des analyses.",
+        "nf_back": "Accueil de l'appli",
+    },
+    "en": {
+        "corners_word": "corners", "cards_word": "cards", "more_corners": "More corners",
+        "more_cards": "More cards", "equal_word": "{what}: level",
+        "vd_title": "Verdicts", "vd_lead": "Yes or no, and the chance that the answer is right.",
+        "vd_best": "Most reliable", "vd_yes": "YES", "vd_no": "NO", "vd_open": "CLOSE",
+        "vd_open_help": "Too close to call: neither yes nor no above 55%.",
+        "vd_proof": "This kind of verdict came true {won} times out of {n} ({rate}) in the {season} season, tested without the engine having seen it.",
+        "vd_proof_none": "No verdict is a certainty: out of 10 verdicts at {pct}, about {miss} fail.",
+        "vd_note": "The percentage is the chance that the answer (YES or NO) is right. Never a certainty.",
+        "vd_q_win": "{team} to win?", "vd_q_dc": "{sel}?", "vd_q_ou": "Over {line} goals?",
+        "vd_q_btts": "Both teams to score?", "vd_q_tt": "{team} to score?",
+        "vd_q_co": "Over {line} corners?", "vd_q_ca": "Over {line} cards?",
+        "vd_partial": "Corners and cards estimated from each club's league (one of them has no data: less reliable estimate).",
+        "why_title": "Why", "why_lead": "The reasons behind this analysis, in expected goals.",
+        "counts_none": "No free corner or card figures for this competition.",
+        "counts_none_cup": "No corners or cards for this match: neither club has free figures in its league.",
+        "counts_title": "Expected corners and cards",
+        "counts_line": "{h} – {a} corners · {ch} – {ca} cards",
+        "ha_title": "Recent analyses", "ha_lead": "Every match we analysed, its final score and its verdicts: right or wrong.",
+        "ha_yesterday": "Yesterday", "ha_before": "Day before", "ha_week": "Last 7 days",
+        "ha_none": "No finished analysis for this day yet.",
+        "ha_day": "{won} correct verdicts out of {n} ({rate}) for {ann} announced",
+        "ha_best": "“Most reliable” verdict: {won} out of {n} ({rate})",
+        "ha_pending": "Waiting for the result", "ha_void": "Match postponed or cancelled",
+        "ha_unverif": "Not verifiable (no free figures)",
+        "ha_engine_v1": "Previous engine", "ha_open_match": "See the verdicts",
+        "ha_past_match": "This match is over. Here is what our analysis said.",
+        "rel_title": "Verified reliability",
+        "pk_why": "Why",
+        "rel_tested": "matches tested on the {season} season, which the engine had never seen",
+        "rel_best": "of “most reliable” verdicts right in that test ({a} announced)",
+        "tk_same_match": "Two picks come from the same match: they are linked, so the slip's real chance may differ.",
+        "yesterday_title": "Yesterday",
+        "yesterday_line": "{won} bets won out of {n} ({rate})",
+        "vd_res_won": "Right", "vd_res_lost": "Wrong", "vd_res_void": "Match postponed or cancelled",
+        "vd_res_nv": "Not verifiable (no free figures)",
+        "vd_res_open": "Too close: not counted in the record",
+        "ha_void_short": "Postponed", "ha_ok": "right", "ha_pending_short": "Pending",
+        "ha_old_day": "On that day only the bet lists were recorded (previous engine): no per-match verdicts yet.",
+        "ha_note": "Every verdict is recorded before kick-off, then judged with the final score. “Close” verdicts don't count. Corners and cards: judged when the figures are published (2 to 4 days), not verifiable for cups.",
+        "ha_past_title": "what the analysis said", "ha_final": "Full time",
+        "ha_said": "What the analysis gave", "ha_top_score": "Most likely score: {s}",
+        "ha_see_today": "See upcoming matches",
+        "hist_old_engine": "Previous engine", "hist_bets_title": "Daily bets: the record",
+        "nf_title": "Page not found", "nf_text": "This page doesn't exist (any more). Finished matches are in the analysis history.",
+        "nf_back": "App home",
+    },
+}
+
 for _lang in LANGS:
     UI[_lang].update(_EXTRA[_lang])
     UI[_lang].update(_BETS[_lang])
+    UI[_lang].update(_V2[_lang])
     _JS[_lang].update(_JS_EXTRA[_lang])
     _JS[_lang].update(_BETS_JS[_lang])
 
@@ -935,5 +1047,14 @@ def pick_label(key: str, sel: str, line: float | None, lang: str, home: str, awa
         return t["btts_yes_long"] if sel == "yes" else t["btts_no_long"]
     if key == "dnb":
         return f"{selection_label(key, sel, line, lang, home, away)} ({t['dnb_short']})"
+    if key in ("co", "ca", "cot1", "cot2", "cat1", "cat2"):
+        word = t["corners_word" if key.startswith("co") else "cards_word"]
+        txt = f"{selection_label(key, sel, line, lang, home, away)} {word}"
+        if key[-1] in "12":
+            return f"{home if key[-1] == '1' else away}{JS_COLON[lang]}{txt[:1].lower() + txt[1:]}"
+        return txt
+    if key in ("co1x2", "ca1x2"):
+        word = t["more_corners" if key == "co1x2" else "more_cards"]
+        return t["equal_word"].format(what=word) if sel == "X" else f"{word}{JS_COLON[lang]}{home if sel == '1' else away}"
     return selection_label(key, sel, line, lang, home, away)
 

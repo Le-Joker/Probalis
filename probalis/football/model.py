@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Callable
 
 import numpy as np
 from scipy.optimize import minimize, minimize_scalar
@@ -53,11 +54,20 @@ class TeamModel:
 
 
 def fit(matches: list[MatchRow], ref_date: date, xi: float = DEFAULT_XI, ridge: float = DEFAULT_RIDGE,
-        max_days: int = DEFAULT_MAX_DAYS, include_ref_day: bool = False) -> TeamModel:
+        max_days: int = DEFAULT_MAX_DAYS, include_ref_day: bool = False,
+        target: Callable[[MatchRow], "tuple[float, float] | None"] | None = None) -> TeamModel:
     """include_ref_day=True : les matchs déjà terminés le jour même comptent aussi (site en direct).
-    Les tests de fiabilité gardent False, pour ne jamais utiliser le résultat du match qu'on prédit."""
+    Les tests de fiabilité gardent False, pour ne jamais utiliser le résultat du match qu'on prédit.
+
+    target : ce que le modèle apprend à prévoir à la place des buts (buts mérités, corners, cartons…),
+    sous la forme (domicile, extérieur) ; les matchs sans ce chiffre sont ignorés. Dans ce cas, rho
+    (correction des petits scores) n'a pas de sens et vaut 0."""
     ms = [m for m in matches if m.played and (m.date <= ref_date if include_ref_day else m.date < ref_date)
           and (ref_date - m.date).days <= max_days]
+    goals = ms
+    if target is not None:
+        pairs = [(m, t) for m in ms if (t := target(m)) is not None]
+        ms = [m for m, _ in pairs]
     if len(ms) < 30:
         raise ValueError(f"Pas assez de matchs pour estimer le modèle ({len(ms)}).")
     teams = sorted({m.home for m in ms} | {m.away for m in ms})
@@ -65,8 +75,12 @@ def fit(matches: list[MatchRow], ref_date: date, xi: float = DEFAULT_XI, ridge: 
     n = len(teams)
     h = np.array([idx[m.home] for m in ms])
     a = np.array([idx[m.away] for m in ms])
-    x = np.array([m.fthg for m in ms], dtype=float)
-    y = np.array([m.ftag for m in ms], dtype=float)
+    if target is None:
+        x = np.array([m.fthg for m in ms], dtype=float)
+        y = np.array([m.ftag for m in ms], dtype=float)
+    else:
+        x = np.array([t[0] for _, t in pairs], dtype=float)
+        y = np.array([t[1] for _, t in pairs], dtype=float)
     w = np.exp(-xi * np.array([(ref_date - m.date).days for m in ms], dtype=float))
 
     def objective(theta: np.ndarray):
@@ -99,9 +113,9 @@ def fit(matches: list[MatchRow], ref_date: date, xi: float = DEFAULT_XI, ridge: 
             return 1e12
         return -float(np.sum(w * np.log(tau)))
 
-    rho = float(minimize_scalar(rho_nll, bounds=(-0.25, 0.25), method="bounded").x)
+    rho = float(minimize_scalar(rho_nll, bounds=(-0.25, 0.25), method="bounded").x) if target is None else 0.0
 
-    ht = [(m.hthg + m.htag, m.fthg + m.ftag) for m in ms if m.hthg is not None and m.htag is not None]
+    ht = [(m.hthg + m.htag, m.fthg + m.ftag) for m in goals if m.hthg is not None and m.htag is not None]
     total = sum(t for _, t in ht)
     share = sum(f for f, _ in ht) / total if total else 0.45
 

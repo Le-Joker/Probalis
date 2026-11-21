@@ -8,6 +8,12 @@
   <p class="lead">{{ t.bets_lead }}</p>
 </div>
 
+{% if yday %}<a class="yday" href="{{ root }}historique.html">
+  <span class="yd-ic">{{ icon('history', 18, 2.2) }}</span>
+  <span class="yd-t"><small>{{ t.yesterday_title }} · {{ yday.label }}</small><b>{{ yday.txt }}</b></span>
+  {{ icon('chev-right', 18, 2.4) }}
+</a>{% endif %}
+
 {% if days %}
 <div class="days scroll-x js-only" id="pdays" role="group" aria-label="{{ t.choose_day }}">
 {% for d in days %}
@@ -64,8 +70,8 @@
 <section class="rel" aria-labelledby="rel-title">
   <div class="rel-head"><span class="badge">{{ icon('shield', 18, 2.2) }}</span><h2 id="rel-title">{{ t.reliability }}</h2></div>
   <div class="stats">
-    <div><b>{% if lang == 'fr' %}3 276{% else %}3,276{% endif %}</b><small>{{ t.rel_matches }}</small></div>
-    <div><b class="neg">{% if lang == 'fr' %}−12 %{% else %}−12%{% endif %}</b><small>{{ t.rel_gold }}</small></div>
+    {% if rel.n %}<div><b>{{ rel.n }}</b><small>{{ t.rel_tested.format(season=rel.season) }}</small></div>{% endif %}
+    {% if rel.best %}<div><b>{{ rel.best }}</b><small>{{ t.rel_best.format(a=rel.best_ann) }}</small></div>{% endif %}
   </div>
   <p>{{ t.rel_short }}</p>
   <a class="rel-link" href="{{ root }}historique.html">{{ t.see_history }}{{ icon('chev-right', 16, 2.4) }}</a>

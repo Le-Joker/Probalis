@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_card.html" import crest %}
+{% from "_analyses.html" import vd_res with context %}
+{% block title %}{{ m.home }} – {{ m.away }}{% if m.score_txt %} ({{ m.score_txt }}){% endif %} : {{ t.ha_past_title }} · Probalis{% endblock %}
+{% block description %}{{ m.league_name }} · {{ m.home }} – {{ m.away }} : {{ t.ha_past_match }}{% endblock %}
+
+{% block header %}
+<header class="hero past">
+  <span class="hero-ring" aria-hidden="true"></span>
+  <div class="hero-top">
+    <a class="round glass" href="{{ root }}historique.html#analyses" aria-label="{{ t.back }}" title="{{ t.back }}">{{ icon('arrow-left', 20, 2.2) }}</a>
+    <span class="hero-league"><span>{{ m.league_name }}</span></span>
+    <span class="round-ph" aria-hidden="true"></span>
+  </div>
+  <div class="hero-teams">
+    <h1 class="sr-only">{{ m.home }} – {{ m.away }}</h1>
+    <div class="side"><span class="disc xl">{{ crest(m.home_crest, big=true, eager=true) }}</span><span class="nm">{{ m.home }}</span></div>
+    <div class="hero-when"><span class="big">{% if m.score_txt %}{{ m.score_txt }}{% else %}–{% endif %}</span><small>{{ m.day_med }}</small></div>
+    <div class="side"><span class="disc xl">{{ crest(m.away_crest, big=true, eager=true) }}</span><span class="nm">{{ m.away }}</span></div>
+  </div>
+  <div class="hero-chips">
+    <span class="hchip">{{ icon('history', 14, 2.2) }}{% if m.status == 'void' %}{{ t.ha_void }}{% elif m.status == 'wait' %}{{ t.ha_pending }}{% else %}{{ t.ha_final }}{% endif %}</span>
+    {% if m.stats %}<span class="hchip">{{ icon('target', 14, 2.2) }}{{ m.stats }}</span>{% endif %}
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<p class="past-note">{{ icon('info', 16, 2.2) }}<span>{{ t.ha_past_match }}</span></p>
+
+<section class="card vcard" aria-labelledby="pv-title">
+  <div class="card-head"><h2 id="pv-title">{{ t.vd_title }}</h2>{% if m.n %}<span class="ha-ok{% if m.ok / m.n >= 0.7 %} good{% endif %}"><b>{{ m.ok }}/{{ m.n }}</b><small>{{ t.ha_ok }}</small></span>{% endif %}</div>
+  <div class="vd-wrap">
+  {% if m.best %}<div class="vd-top">
+    <span class="vd-tag">{{ t.vd_best }}</span>
+    <div class="vd-q">{{ m.best.q }}</div>
+    <div class="vd-ans"><b class="vd-a {{ m.best.cls }}">{{ m.best.ans }}</b><span class="vd-p">{{ m.best.pct }}</span>{{ vd_res(m.best.res) }}</div>
+  </div>{% endif %}
+  <div class="vds">
+  {% for v in m.rows %}<div class="vd has-res{% if v.best %} is-best{% endif %}"><span class="vd-q">{{ v.q }}</span><b class="vd-a {{ v.cls }}">{{ v.ans }}</b><b class="vd-p">{{ v.pct }}</b>{{ vd_res(v.res) }}</div>
+  {% endfor %}
+  </div>
+  </div>
+  {% if m.nv %}<p class="note">{{ t.ha_unverif }}.</p>{% endif %}
+  <p class="note">{{ t.vd_note }}</p>
+</section>
+
+{% if m.x %}<section class="card">
+  <h2>{{ t.ha_said }}</h2>
+  <div class="past-x">
+    <div><small>{{ m.home }}</small><b>{{ m.x[0] }}</b></div>
+    <div><small>{{ t.draw_long }}</small><b>{{ m.x[1] }}</b></div>
+    <div><small>{{ m.away }}</small><b>{{ m.x[2] }}</b></div>
+  </div>
+  {% if m.ts %}<p class="note">{{ t.ha_top_score.format(s=m.ts) }}</p>{% endif %}
+</section>{% endif %}
+
+<div class="past-go">
+  <a class="btn" href="{{ root }}index.html">{{ icon('ball', 18, 2.2) }}{{ t.ha_see_today }}</a>
+  <a class="btn ghost" href="{{ root }}historique.html#analyses">{{ icon('history', 18, 2.2) }}{{ t.ha_title }}</a>
+</div>
+{% endblock %}

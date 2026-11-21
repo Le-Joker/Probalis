@@ -34,6 +34,8 @@ KEEP_CLASSES = {
     "otable", "orow", "head", "lbl", "cmp-grid", "field",
     "ring", "trk", "val", "pk-fair", "pk-add", "js-only", "ic",
     "dc-legs", "dc-l", "dc-p", "dc-odds", "dc-load", "btn", "ghost",
+    "vd-wrap", "vd-top", "vd-tag", "vd-q", "vd-ans", "vd-a", "vd-p", "vd-proof", "vds", "vd", "vd-counts",
+    "why", "why-i", "why-d", "why-t",
 }
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 FILL = "—"

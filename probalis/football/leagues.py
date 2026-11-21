@@ -13,10 +13,12 @@ class League:
     country_fr: str
     country_en: str
     slug: str
-    # "domestic" : championnat masculin ; "europe" : coupe d'Europe masculine ; "women" : football féminin
+    # "domestic" : championnat masculin avec fichiers football-data.co.uk ; "europe" : coupe d'Europe masculine ;
+    # "women" : football féminin ; "world" : championnat masculin suivi par TheSportsDB seul (sans cotes)
     category: str = "domestic"
     cup: bool = False  # compétition entre clubs de pays différents (Ligue des champions, etc.)
     logo_on_dark: bool = False  # logo officiel blanc : à afficher sur un fond foncé
+    tier: int = 1      # 2 : division inférieure (rubrique « Divisions inférieures »)
 
 
 LEAGUES: tuple[League, ...] = (
@@ -30,6 +32,15 @@ LEAGUES: tuple[League, ...] = (
     League("P1", 4344, "Liga Portugal", "Liga Portugal", "Portugal", "Portugal", "liga-portugal"),
     League("B1", 4338, "Pro League", "Pro League", "Belgique", "Belgium", "pro-league"),
     League("T1", 4339, "Süper Lig", "Süper Lig", "Turquie", "Turkey", "super-lig"),
+    # Divisions inférieures (fichiers football-data.co.uk, avec cotes ; la National League n'a ni tirs ni corners)
+    League("F2", 4401, "Ligue 2", "Ligue 2", "France", "France", "ligue-2", tier=2),
+    League("SP2", 4400, "LaLiga 2", "LaLiga 2", "Espagne", "Spain", "laliga-2", tier=2),
+    League("E2", 4396, "League One", "League One", "Angleterre", "England", "league-one", tier=2),
+    League("E3", 4397, "League Two", "League Two", "Angleterre", "England", "league-two", tier=2),
+    League("EC", 4590, "National League", "National League", "Angleterre", "England", "national-league", tier=2),
+    # Championnats suivis par TheSportsDB seul (pas de fichier football-data.co.uk, donc pas de cotes)
+    League("SA", 4668, "Saudi Pro League", "Saudi Pro League", "Arabie saoudite", "Saudi Arabia",
+           "saudi-pro-league", "world"),
     # Coupes d'Europe : un modèle commun relie les forces des différents pays (voir football/linked.py)
     League("UCL", 4480, "Ligue des champions", "Champions League", "Europe", "Europe", "ligue-des-champions",
            "europe", True, logo_on_dark=True),

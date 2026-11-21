@@ -5,6 +5,7 @@
   leur nom, pays par pays.
 - Football féminin : tout vient de TheSportsDB (cinq grands championnats + Ligue des champions féminine),
   les équipes sont identifiées par leur numéro TheSportsDB.
+- Championnats « TheSportsDB seul » (Ligue saoudienne) : même principe que le football féminin.
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ CUP_ROUNDS = (1, 2, 3, 4, 5, 6, 7, 8, 32, 16, 125, 150, 200, 400)  # numérotati
 FINAL_ROUND = "200"
 MAX_ROUNDS = 40
 WOMEN_MAX_DAYS = 2 * 365
+WORLD_MAX_DAYS = 2 * 365
 
 # Championnats nationaux masculins qui servent à situer les clubs : pays -> (fichier, code football-data)
 DOMESTIC_SOURCES = {
@@ -235,8 +237,9 @@ def _group_table(model: LinkedModel) -> list[list]:
     return sorted(rows, key=lambda r: -r[1])
 
 
-def women_data(leagues: list[League], today: date) -> LinkedData:
-    """Matchs des championnats féminins et de la Ligue des champions féminine (équipes = numéros TheSportsDB)."""
+def tsdb_data(leagues: list[League], today: date) -> LinkedData:
+    """Matchs de championnats (et de coupes) suivis par TheSportsDB seul : football féminin, Ligue saoudienne.
+    Les équipes sont identifiées par leur numéro TheSportsDB ; deux saisons."""
     games: list[Game] = []
     group_of: dict[str, str] = {}
     display: dict[str, str] = {}
@@ -264,14 +267,30 @@ def women_data(leagues: list[League], today: date) -> LinkedData:
     return LinkedData(games, group_of, {n[1:]: n for n in group_of}, display, [])
 
 
+women_data = tsdb_data
+
+
 def women(leagues: list[League], today: date, verbose: bool = True) -> Linked | None:
     """Modèle commun à tous les championnats féminins et à la Ligue des champions féminine."""
     if not leagues:
         return None
-    d = women_data(leagues, today)
+    d = tsdb_data(leagues, today)
     model = fit_linked(d.games, d.group_of, today, max_days=WOMEN_MAX_DAYS, include_ref_day=True)
     if verbose:
         n_cup = sum(g.kind == "cup" for g in d.games)
         print(f"  Football féminin : {len(d.games) - n_cup} matchs de championnat + {n_cup} matchs européens, "
               f"{len(model.teams)} équipes")
+    return Linked(model, d.node_of_id, d.names, {"countries": _group_table(model)})
+
+
+def world(leagues: list[League], today: date, verbose: bool = True) -> Linked | None:
+    """Championnats masculins suivis par TheSportsDB seul (Ligue saoudienne) : un modèle par lot, sans cotes."""
+    if not leagues:
+        return None
+    d = tsdb_data(leagues, today)
+    current, _ = _current_season(leagues[0], today)
+    model = fit_linked(d.games, d.group_of, today, max_days=WORLD_MAX_DAYS, include_ref_day=True,
+                       first_half_share=_first_half_share(_season_start(current)))
+    if verbose:
+        print(f"  Autres championnats (TheSportsDB) : {len(d.games)} matchs, {len(model.teams)} équipes")
     return Linked(model, d.node_of_id, d.names, {"countries": _group_table(model)})

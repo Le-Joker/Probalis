@@ -69,6 +69,18 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // Nos copies des logos (/logos/…) : le nom change avec l'image, on peut les garder longtemps
+  if (url.pathname.startsWith('/logos/')) {
+    e.respondWith(caches.open(CRESTS).then((c) => c.match(req).then((hit) => hit || fetch(req).then((res) => {
+      if (res.ok) {
+        c.put(req, res.clone());
+        e.waitUntil(trim(CRESTS, MAX_CRESTS));
+      }
+      return res;
+    }))));
+    return;
+  }
+
   // Chiffres protégés et données : toujours demandés au serveur
   if (url.pathname.startsWith('/lk/') || url.pathname.startsWith('/data/')) return;
 

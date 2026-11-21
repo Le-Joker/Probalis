@@ -1,9 +1,10 @@
 """Simulation des « paris du jour » sur une saison passée (affichée dans l'onglet Historique).
 
-Mêmes règles que le site (probalis/site/picks.py) : chaque semaine, le modèle n'apprend que sur les matchs
-d'avant ; ses buts attendus sont calés sur les cotes moyennes des bookmakers d'avant-match (comme sur le site
-quand ces cotes existent) ; on choisit chaque jour les 5 paris de chaque niveau et les coupons du jour, puis on
-les règle avec le score final. Le résultat est enregistré dans probalis/site/simulation.json.
+Mêmes règles et même moteur que le site (football/engine.py, site/picks.py) : chaque semaine, le moteur
+n'apprend que sur les matchs d'avant ; il mélange son analyse aux cotes moyennes des bookmakers d'avant-match
+(comme sur le site quand ces cotes existent) ; on choisit chaque jour les 5 paris de chaque niveau et les
+coupons du jour, puis on les règle avec le score final. Le résultat est enregistré dans
+probalis/site/simulation.json.
 
 Usage : python -m probalis.football.simulation --season 2526
 """
@@ -15,14 +16,11 @@ from collections import defaultdict
 from datetime import timedelta
 from pathlib import Path
 
-from ..core.implied import implied_rates
-from ..core.value import devig
 from ..site import picks
 from .backtest import _in_season, _odds, _prev_season
 from .data import load_history
+from .engine import analyse, fit_league, load_params
 from .leagues import BY_CODE, LEAGUES
-from .model import fit
-from .predict import confidence, predict, predict_from_rates
 
 OUT = Path(__file__).resolve().parents[1] / "site" / "simulation.json"
 PRE_1X2 = (("AvgH", "AvgD", "AvgA"), ("B365H", "B365D", "B365A"))
@@ -34,6 +32,7 @@ def _matches(codes: list[str], season: str, calibrate: bool, verbose: bool) -> t
     seasons = [season, _prev_season(season), _prev_season(_prev_season(season)),
                _prev_season(_prev_season(_prev_season(season)))]
     out, scores = [], {}
+    params = load_params()
     for code in codes:
         hist = load_history(code, seasons)
         test = sorted((m for m in hist if _in_season(m, season)), key=lambda m: m.date)
@@ -44,19 +43,15 @@ def _matches(codes: list[str], season: str, calibrate: bool, verbose: bool) -> t
         while week <= test[-1].date:
             batch = [m for m in test if week <= m.date < week + timedelta(days=7)]
             if batch:
-                model = fit(hist, week)
+                lm = fit_league(hist, week, params, counts=False)
+                model = lm.goals
                 for m in batch:
                     if not (model.knows(m.home) and model.knows(m.away)) or m.fthg is None:
                         continue
-                    pred = predict(model, m.home, m.away)
-                    conf = confidence(model, m.home, m.away)
-                    o12 = _odds(m, PRE_1X2)
-                    if calibrate and o12:
-                        oou = _odds(m, PRE_OU)
-                        p_over = devig(oou)[0] if oou else None
-                        lam, mu = implied_rates(devig(o12), model.rho, p_over, start=(pred.lam, pred.mu))
-                        pred = predict_from_rates(model, m.home, m.away, lam, mu)
-                        conf = "high"
+                    o12 = _odds(m, PRE_1X2) if calibrate else None
+                    oou = _odds(m, PRE_OU) if o12 else None
+                    an = analyse(lm, m.home, m.away, o12, oou, params)
+                    pred, conf = an.pred, an.confidence
                     mid = f"{code}-{m.date.isoformat()}-{m.home}-{m.away}"
                     out.append({"id": mid, "league": code, "kickoff": f"{m.date.isoformat()}T15:00:00+00:00",
                                 "confidence": conf, "markets": [mk.to_dict() for mk in pred.markets]})
@@ -150,7 +145,7 @@ def main() -> None:
     matches, scores = _matches(args.leagues, args.season, not args.model_only, True)
     res = simulate(matches, scores)
     s = args.season
-    res.update(season=f"20{s[:2]}/{s[2:]}", matches=len(matches),
+    res.update(season=f"20{s[:2]}/{s[2:]}", matches=len(matches), engine=load_params().version,
                matches_txt={lg: _num(len(matches), lg) for lg in ("fr", "en")},
                calibrated=not args.model_only, leagues=args.leagues)
     for t, v in res["tiers"].items():

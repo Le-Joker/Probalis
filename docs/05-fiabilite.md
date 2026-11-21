@@ -94,3 +94,75 @@ premiers résultats sont connus.
 d'autres équipes. Ce que l'appli fait des résultats du jour : ils mettent à jour la force des **deux équipes qui
 viennent de jouer**, pour leurs matchs suivants. Les analyses sont recalculées toutes les 2 heures pour intégrer
 ces résultats, les changements d'horaire, les reports et les nouvelles cotes dès qu'elles sont publiées.
+
+## Nouveau moteur « fait maison » (test du 21/11/2026)
+
+Commande : `python -m probalis.football.tune --train 2425 --test 2526 --write` (15 championnats avec fichiers
+football-data, y compris les 5 nouvelles divisions). Les réglages sont appris sur 2024/25 (5 522 matchs), puis
+mesurés sur 2025/26 (5 484 matchs), une saison que le moteur n'a jamais vue, semaine par semaine (le moteur ne
+connaît que les matchs déjà joués). Réglages enregistrés dans `probalis/football/engine_params.json`.
+
+Indices combinés : force des équipes sur 3 saisons (buts), buts « mérités » tirés des tirs et tirs cadrés (part 0,185),
+forme récente à mémoire courte (part 0,457, mesurée sur les buts mérités), écart entre équipes un peu accentué
+(t = 1,313), total de buts presque inchangé (s = 0,992). Avec des cotes : marge retirée par la méthode « puissance »,
+puis cotes seules (part apprise : 1,0, le modèle ne fait pas mieux que le marché juste avant le match).
+
+Règle d'adoption : le nouveau moteur ne remplace l'ancien que si son log-loss est au moins aussi bon sur le 1X2 et sur
+plus/moins de 2,5 buts, avec et sans cotes (borne haute à 95 % de l'écart, bootstrap par journée, ≤ +0,0005).
+
+| Chemin | Marché | Ancien | Nouveau | Brier ancien → nouveau | Décision |
+|---|---|---|---|---|---|
+| Modèle seul | 1X2 | 1,01977 | 1,01339 | 0,6111 → 0,6071 | adopté |
+| Modèle seul | Plus/moins 2,5 | 0,69088 | 0,68369 | 0,2487 → 0,2454 | adopté |
+| Avec cotes | 1X2 | 1,00251 | 1,00144 | 0,5995 → 0,5990 | adopté |
+| Avec cotes | Plus/moins 2,5 | 0,67898 | 0,67892 | 0,2431 → 0,2431 | adopté (égalité) |
+
+Corners et cartons (loi binomiale négative, écart propre aux équipes réduit vers la moyenne du championnat :
+0,748 pour les corners, 0,65 pour les cartons). Comparés à « la moyenne du championnat pour tout le monde » :
+
+| Marché | Matchs | Lignes : moteur (moyenne) | Décision |
+|---|---|---|---|
+| Corners | 4 988 | 8,5 : 0,6600 (0,6627) · 9,5 : 0,6905 (0,6921) · 10,5 : 0,6651 (0,6676) | adopté |
+| Cartons | 5 484 | 3,5 : 0,6607 (0,6677) · 4,5 : 0,6511 (0,6595) | adopté |
+
+Le gain sur les corners est petit : les corners sont difficiles à prévoir. On le dit dans la fiche (pourcentages modestes).
+
+### Verdicts OUI / NON : annoncé contre réussi (2025/26)
+
+| Verdict | Nombre | Réussis | Annoncés |
+|---|---|---|---|
+| « Le plus sûr » du match | 5 484 | 82,5 % | 82,3 % |
+| Double chance | 5 484 | 77,8 % | 77,9 % |
+| Plus de 1,5 but | 5 484 | 75,8 % | 75,6 % |
+| Chaque équipe marque | 10 968 | 74,0 % | 72,6 % |
+| Plus de 3,5 buts | 5 484 | 71,1 % | 70,4 % |
+| Cartons | 5 484 | 67,5 % | 68,8 % |
+| Corners | 4 988 | 65,7 % | 66,6 % |
+| Victoire du favori | 5 484 | 58,5 % | 59,2 % |
+| Plus de 2,5 buts | 5 484 | 56,1 % | 56,9 % |
+| Les deux équipes marquent | 5 484 | 55,0 % | 55,2 % |
+
+Les pourcentages annoncés tiennent : l'écart reste sous 1,5 point partout. Le tableau de fiabilité complet (par famille
+et par tranche de 5 points) est dans `engine_params.json` (clé `reliability`) ; la fiche d'un match l'utilise pour la
+phrase de preuve du verdict « le plus sûr ».
+
+Ce qui n'est pas vérifiable gratuitement : corners et cartons des coupes d'Europe (estimés à partir du championnat de
+chaque club ; aucune source gratuite ne publie leurs chiffres). Ligue saoudienne et football féminin : ni corners ni
+cartons (pas de données). Ces verdicts n'entrent pas dans les taux de l'historique.
+
+### Simulation des paris du jour avec le nouveau moteur (2025/26, 15 championnats)
+
+`python -m probalis.football.simulation --season 2526` (calée sur les cotes, comme le site). Résultat repris par le site
+(`probalis/site/simulation.json`) :
+
+| Liste | Paris | Réussite | Annoncé | Gain ou perte à la cote estimée du bookmaker |
+|---|---|---|---|---|
+| Prudent | 1 043 | 77,6 % | 78,6 % | −6,0 % |
+| Équilibré | 1 045 | 65,6 % | 66,3 % | −5,6 % |
+| Audacieux | 1 049 | 49,9 % | 48,9 % | −2,9 % |
+| Coupon cote ≈ 2 | 216 | 49,5 % | 43,6 % | +3,0 % |
+| Coupon cote ≈ 3 | 216 | 32,9 % | 29,1 % | +2,4 % |
+| Coupon cote ≈ 5 | 213 | 18,3 % | 16,7 % | −4,7 % |
+
+Les chances annoncées tiennent (écart d'environ 1 point sur les listes). Le petit gain des coupons à cote 2 et 3 vient
+d'un petit nombre de coupons (216) : ce n'est pas un avantage durable, on ne le présente jamais comme tel.

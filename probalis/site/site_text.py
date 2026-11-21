@@ -8,7 +8,7 @@ from __future__ import annotations
 SITE = {
     "fr": {
         "title": "Probalis · La vraie chance de chaque pari de foot",
-        "description": "Probalis calcule la vraie chance de chaque pari de football sur 19 compétitions et te la dit en mots simples, "
+        "description": "Probalis calcule la vraie chance de chaque pari de football sur 25 compétitions et te la dit en mots simples, "
                        "pour la comparer à la cote de ton bookmaker. Gratuit, sans promesse de gain.",
         "og_locale": "fr_FR",
         "skip": "Aller au contenu",
@@ -21,7 +21,7 @@ SITE = {
 
         "hero_kicker": "La science du pari",
         "hero_h1_html": "«&nbsp;8&nbsp;fois sur&nbsp;10&nbsp;», <span>vraiment</span> 8&nbsp;fois sur&nbsp;10.",
-        "hero_lead": "Probalis calcule la vraie chance de chaque pari de foot, sur 19 compétitions, et te la dit en mots simples. "
+        "hero_lead": "Probalis calcule la vraie chance de chaque pari de foot, sur 25 compétitions, et te la dit en mots simples. "
                      "Tu la compares à la cote de ton bookmaker avant de remplir ton coupon.",
         "hero_cta": "Accéder à l'application",
         "hero_cta2": "Voir les paris du jour",
@@ -35,12 +35,12 @@ SITE = {
         "shot_alt_history": "L'historique public de Probalis : les listes enregistrées avant les matchs",
 
         "proof_h2": "On a vérifié sur une saison entière.",
-        "proof_lead": "Saison {season}, {n} matchs de 10 championnats. Chaque semaine, le modèle ne connaissait que les matchs déjà "
+        "proof_lead": "Saison {season}, {n} matchs de {leagues} championnats. Chaque semaine, le modèle ne connaissait que les matchs déjà "
                       "joués, exactement comme en vrai. Résultat : ce qu'il annonce, c'est ce qui arrive.",
         "proof_announced": "Annoncé", "proof_real": "Réel",
         "proof_n": "{n} paris", "proof_coupon": "Coupons à cote ≈ 2",
         "proof_note": "Avoir raison sur la chance ne veut pas dire gagner de l'argent : le bookmaker garde une marge sur chaque cote. "
-                      "À ses cotes estimées, ces paris auraient perdu entre {lo} et {hi} des mises. On préfère te le dire.",
+                      "À ses cotes estimées, les paris des trois niveaux auraient perdu entre {lo} et {hi} des mises. On préfère te le dire.",
         "proof_note_link": "Comprendre la marge",
         "proof_caption": "Chance annoncée et réussite réelle, saison {season}",
 
@@ -63,8 +63,9 @@ SITE = {
         "tour": [
             {"tab": "Onglet Matchs", "shot": "match",
              "h3": "Chaque match, décortiqué",
-             "p": "Résultat, double chance, nombre de buts, les deux équipes marquent, score exact… Plus de 90 paris par match, "
-                  "chacun avec sa chance en mots simples et sa cote juste."},
+             "p": "Des verdicts clairs (« Plus de 2,5 buts ? OUI, 64 % »), le plus sûr mis en avant, et les raisons chiffrées "
+                  "du calcul. Plus de 90 paris par match, corners et cartons compris quand les chiffres existent, chacun avec "
+                  "sa chance en mots simples et sa cote juste."},
             {"tab": "Onglet Paris", "shot": "bets",
              "h3": "Les plus sûrs du jour, en trois niveaux",
              "p": "Prudent, Équilibré ou Audacieux : chaque jour, les 5 paris les plus probables de chaque niveau, sur des marchés "
@@ -75,8 +76,8 @@ SITE = {
                   "un remplaçant. Entre la cote de ton bookmaker : tu sais tout de suite si elle vaut le coup."},
             {"tab": "Onglet Historique", "shot": "history",
              "h3": "Nos résultats, sans maquillage",
-             "p": "Les listes sont enregistrées avant les matchs et réglées avec le score final. Tu vois les jours gagnés comme les "
-                  "jours perdus, et le test complet de la saison passée."},
+             "p": "Les analyses et les listes sont enregistrées avant les matchs, puis jugées avec le score final. Hier, avant-hier, "
+                  "la semaine : tu vois chaque verdict juste ou faux, les jours gagnés comme les jours perdus."},
         ],
 
         "odds_h2": "Ta cote cache une chance. Tape-la.",
@@ -109,9 +110,10 @@ SITE = {
                             "nourriture ou de l'école. <b>Interdit aux moins de 18 ans.</b>",
         "responsible_link": "Jeu responsable",
 
-        "comp_h2": "19 compétitions suivies.",
-        "comp_lead": "Les grands championnats, les coupes d'Europe et le football féminin. Les paris du jour gardent seulement les "
-                     "matchs les plus fiables : le football féminin a son analyse, mais n'entre pas dans les listes.",
+        "comp_h2": "25 compétitions suivies.",
+        "comp_lead": "Les grands championnats et leurs divisions inférieures, la Ligue saoudienne, les coupes d'Europe et le "
+                     "football féminin. Les paris du jour gardent seulement les matchs les plus fiables : le football féminin a "
+                     "son analyse, mais n'entre pas dans les listes.",
 
         "price_h2": "Gratuit pour commencer. Premium pour tout voir.",
         "price_cur_label": "Monnaie",
@@ -125,7 +127,7 @@ SITE = {
         "pass_names": {"week": "7 jours", "month": "30 jours", "quarter": "3 mois", "half": "6 mois", "year": "1 an"},
         "pass_best": "Le plus avantageux",
         "save_note": "Remises calculées par jour, par rapport au pass 30 jours.",
-        "prem_items": ["Tous les matchs, toutes les analyses", "Les 5 paris de chaque niveau et les coupons du jour",
+        "prem_items": ["Tous les matchs, avec leurs verdicts OUI / NON", "Les 5 paris de chaque niveau et les coupons du jour",
                        "Ton coupon analysé jusqu'à 10 matchs", "Sans pub"],
         "prem_note": "Pass sans abonnement : tu paies une fois, rien ne se renouvelle tout seul. "
                      "Le paiement par mobile money et carte ouvre très bientôt.",
@@ -170,8 +172,14 @@ SITE = {
              "terme, parier fait perdre un peu d'argent, même avec de bons chiffres. Probalis t'aide à éviter les mauvais paris et à "
              "miser en connaissant tes vraies chances."),
             ("D'où viennent les chances ?",
-             "D'un modèle statistique qui étudie les buts marqués et encaissés par chaque équipe, ajusté sur les cotes moyennes du "
-             "marché quand elles existent. Les données viennent de football-data.co.uk et de TheSportsDB."),
+             "D'un moteur fait maison qui pèse plusieurs indices : la force de chaque équipe sur trois saisons, les occasions "
+             "créées (tirs et tirs cadrés), la forme récente, l'avantage du terrain, puis les cotes moyennes du marché quand elles "
+             "existent. Ses réglages sont appris sur la saison 2024/25, puis vérifiés sur 2025/26, une saison qu'il n'avait jamais "
+             "vue. Les données viennent de football-data.co.uk et de TheSportsDB."),
+            ("C'est quoi, le verdict « le plus sûr » ?",
+             "Dans chaque match, la question où le moteur est le plus sûr de sa réponse (OUI ou NON). Sur la saison 2025/26, "
+             "testée sans que le moteur l'ait vue, ce verdict s'est vérifié environ 8 fois sur 10. Ce n'est jamais une certitude : "
+             "2 fois sur 10, il ne passe pas. Chaque jour, l'historique montre lesquels sont passés."),
             ("Pourquoi jamais 100 % ?",
              "Parce que rien n'est certain dans le foot. Même un pari à 90 % perd 1 fois sur 10 : on préfère te le rappeler."),
             ("C'est quoi, la cote juste ?",
@@ -200,7 +208,7 @@ SITE = {
     },
     "en": {
         "title": "Probalis · The real chance of every football bet",
-        "description": "Probalis works out the real chance of every football bet across 19 competitions and says it in plain words, "
+        "description": "Probalis works out the real chance of every football bet across 25 competitions and says it in plain words, "
                        "so you can compare it with your bookmaker's odds. Free, with no promise of winnings.",
         "og_locale": "en_GB",
         "skip": "Skip to content",
@@ -213,7 +221,7 @@ SITE = {
 
         "hero_kicker": "The science of betting",
         "hero_h1_html": "“8 in 10” that <span>really</span> means 8&nbsp;in&nbsp;10.",
-        "hero_lead": "Probalis works out the real chance of every football bet, across 19 competitions, and says it in plain words. "
+        "hero_lead": "Probalis works out the real chance of every football bet, across 25 competitions, and says it in plain words. "
                      "Compare it with your bookmaker's odds before you fill in your slip.",
         "hero_cta": "Get the app",
         "hero_cta2": "See today's bets",
@@ -227,12 +235,12 @@ SITE = {
         "shot_alt_history": "The Probalis public history: lists saved before kick-off",
 
         "proof_h2": "We checked it over a whole season.",
-        "proof_lead": "Season {season}, {n} matches in 10 leagues. Each week, the model only knew the matches already played, "
+        "proof_lead": "Season {season}, {n} matches in {leagues} leagues. Each week, the model only knew the matches already played, "
                       "exactly like in real life. The result: what it announces is what happens.",
         "proof_announced": "Announced", "proof_real": "Actual",
         "proof_n": "{n} bets", "proof_coupon": "Accumulators at odds ≈ 2",
         "proof_note": "Being right about the chance doesn't mean making money: the bookmaker keeps a margin on every price. "
-                      "At its estimated odds, these bets would have lost between {lo} and {hi} of the stakes. We'd rather tell you.",
+                      "At its estimated odds, the bets of the three levels would have lost between {lo} and {hi} of the stakes. We'd rather tell you.",
         "proof_note_link": "Understand the margin",
         "proof_caption": "Announced chance and actual hit rate, season {season}",
 
@@ -255,8 +263,9 @@ SITE = {
         "tour": [
             {"tab": "Matches tab", "shot": "match",
              "h3": "Every match, broken down",
-             "p": "Result, double chance, total goals, both teams to score, correct score… More than 90 bets per match, each with "
-                  "its chance in plain words and its fair odds."},
+             "p": "Clear verdicts (“Over 2.5 goals? YES, 64%”), the most reliable one up front, and the reasons behind the "
+                  "numbers. More than 90 bets per match, corners and cards included when the figures exist, each with its "
+                  "chance in plain words and its fair odds."},
             {"tab": "Bets tab", "shot": "bets",
              "h3": "Today's safest bets, in three levels",
              "p": "Safe, Balanced or Bold: every day, the 5 most likely bets of each level, on markets every bookmaker offers. "
@@ -267,8 +276,8 @@ SITE = {
                   "replacement. Enter your bookmaker's odds: you know at once whether they're worth it."},
             {"tab": "History tab", "shot": "history",
              "h3": "Our results, unvarnished",
-             "p": "Lists are saved before kick-off and settled with the final score. You see the winning days and the losing "
-                  "days, plus the full test of last season."},
+             "p": "Analyses and lists are saved before kick-off, then judged with the final score. Yesterday, the day before, "
+                  "the week: you see every verdict right or wrong, the winning days and the losing days."},
         ],
 
         "odds_h2": "Your odds hide a chance. Type them in.",
@@ -299,9 +308,9 @@ SITE = {
                             "<b>Over 18s only.</b>",
         "responsible_link": "Responsible gambling",
 
-        "comp_h2": "19 competitions covered.",
-        "comp_lead": "The big leagues, the European cups and women's football. Today's bets only keep the most reliable matches: "
-                     "women's football gets its analysis but stays out of the lists.",
+        "comp_h2": "25 competitions covered.",
+        "comp_lead": "The big leagues and their lower divisions, the Saudi Pro League, the European cups and women's football. "
+                     "Today's bets only keep the most reliable matches: women's football gets its analysis but stays out of the lists.",
 
         "price_h2": "Free to start. Premium to see everything.",
         "price_cur_label": "Currency",
@@ -315,7 +324,7 @@ SITE = {
         "pass_names": {"week": "7 days", "month": "30 days", "quarter": "3 months", "half": "6 months", "year": "1 year"},
         "pass_best": "Best value",
         "save_note": "Discounts worked out per day, compared with the 30-day pass.",
-        "prem_items": ["Every match, every analysis", "All 5 bets of each level and today's accumulators",
+        "prem_items": ["Every match, with its YES / NO verdicts", "All 5 bets of each level and today's accumulators",
                        "Your slip analysed up to 10 matches", "No ads"],
         "prem_note": "A pass, not a subscription: you pay once and nothing renews by itself. "
                      "Mobile money and card payments open very soon.",
@@ -360,8 +369,14 @@ SITE = {
              "betting loses a little money, even with good numbers. Probalis helps you avoid bad bets and stake knowing your real "
              "chances."),
             ("Where do the chances come from?",
-             "From a statistical model that studies the goals each team scores and concedes, adjusted to the average market odds "
-             "when they exist. Data comes from football-data.co.uk and TheSportsDB."),
+             "From a home-made engine that weighs several clues: each team's strength over three seasons, the chances they create "
+             "(shots and shots on target), recent form, home advantage, then the average market odds when they exist. Its "
+             "settings are learnt on the 2024/25 season, then checked on 2025/26, a season it had never seen. Data comes from "
+             "football-data.co.uk and TheSportsDB."),
+            ("What is the “most reliable” verdict?",
+             "In every match, the question where the engine is surest of its answer (YES or NO). Over the 2025/26 season, tested "
+             "without the engine having seen it, this verdict came true about 8 times in 10. It's never a certainty: 2 times in "
+             "10 it fails. Every day, the history shows which ones came true."),
             ("Why never 100%?",
              "Because nothing is certain in football. Even a 90% bet loses 1 time in 10: we'd rather remind you."),
             ("What are fair odds?",

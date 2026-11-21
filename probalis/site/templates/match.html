@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_card.html" import crest, league_logo, bar3, pcts, ad %}
+{% from "_card.html" import crest, league_logo, bar3, pcts, ad, lock_pill %}
 {% macro row(r, sub=none) %}<div class="r"><div class="r-l"><span>{{ r.label }}{% if r.push %} <small>({{ t.push }} {{ r.push }})</small>{% endif %}</span>{% if sub %}<small>{{ sub }}</small>{% endif %}<i class="meter"><i class="{{ r.level }}" style="width: {{ r.w }}%"></i></i></div><b class="r-p">{{ r.pct }}</b><span class="pill">{{ r.fair }}</span></div>{% endmacro %}
 {% macro legend() %}<span class="legend" aria-hidden="true"><span>{{ t.chance }}</span><span>{{ t.fair_odds }}</span></span>{% endmacro %}
 {% block title %}{{ m.home.name }} – {{ m.away.name }} : {% if lang == 'fr' %}analyse et probabilités{% else %}analysis and probabilities{% endif %} · Probalis{% endblock %}
@@ -70,6 +70,34 @@
 </nav>
 
 <section class="panel" id="p-resume" aria-label="{{ t.summary }}">
+  <section class="card locked vcard" aria-labelledby="vd-title">
+    <div class="card-head"><h2 id="vd-title">{{ t.vd_title }}</h2>{{ lock_pill(t, root) }}</div>
+    <p class="vd-lead">{{ t.vd_lead }}</p>
+    {% call lk(m=m.slug) %}<div class="vd-wrap">
+    {% if m.vd.top %}<div class="vd-top">
+      <span class="vd-tag">{{ t.vd_best }}</span>
+      <div class="vd-q">{{ m.vd.top.q }}</div>
+      <div class="vd-ans"><b class="vd-a {{ m.vd.top.cls }}">{{ m.vd.top.ans }}</b><span class="vd-p">{{ m.vd.top.pct }}</span></div>
+      <p class="vd-proof">{{ m.vd.top.proof }}</p>
+    </div>{% endif %}
+    <div class="vds">
+    {% for v in m.vd.rows %}<div class="vd{% if v.best %} is-best{% endif %}"><span class="vd-q">{{ v.q }}</span><b class="vd-a {{ v.cls }}">{{ v.ans }}</b><b class="vd-p">{{ v.pct }}</b><i class="meter"><i class="{{ v.level }}" style="width: {{ v.w }}%"></i></i></div>
+    {% endfor %}
+    </div>
+    {% if m.vd.counts_txt %}<p class="vd-counts">{{ icon('target', 14, 2.2) }}<span>{{ m.vd.counts_txt }}</span></p>{% endif %}
+    </div>{% endcall %}
+    <p class="note">{{ t.vd_note }}{% if m.vd.no_counts %} {{ m.vd.none_txt }}{% elif m.vd.partial %} {{ t.vd_partial }}{% endif %}</p>
+  </section>
+
+  {% if m.why %}<section class="card locked">
+    <div class="card-head"><h2>{{ t.why_title }}</h2></div>
+    <p class="vd-lead">{{ t.why_lead }}</p>
+    {% call lk(m=m.slug) %}<ul class="why">
+    {% for f in m.why %}<li class="why-i {{ f.tone }}"><span class="why-d" aria-hidden="true"></span><span class="why-t">{{ f.text }}</span></li>
+    {% endfor %}
+    </ul>{% endcall %}
+  </section>{% endif %}
+
   <section class="card locked">
     <h2>{{ t.xg }}</h2>
     {% call lk(m=m.slug) %}<div class="xg"><b>{{ m.xg_home }}</b><span>{{ t.xg_total.format(x=m.xg_total) }}</span><b>{{ m.xg_away }}</b></div>

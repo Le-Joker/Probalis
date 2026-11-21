@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_picks.html" import pick_card, coupon_card with context %}
+{% from "_analyses.html" import analyses with context %}
 {% block content %}
 <div class="intro">
   <div class="kicker">{{ t.hist_kicker }}</div>
@@ -7,6 +8,9 @@
   <p class="lead">{{ t.hist_lead }}</p>
 </div>
 
+{{ analyses(an) }}
+
+<h2 class="sec-title">{{ t.hist_bets_title }}</h2>
 {% if h.since %}<p class="tier-help">{{ icon('calendar', 14, 2.4) }} {{ t.hist_since.format(d=h.since) }}</p>{% endif %}
 
 <section class="hstats" aria-label="{{ t.tiers_label }}">
@@ -34,7 +38,7 @@
 {% for d in h.days %}
 <details class="hday"{% if loop.index <= 2 %} open{% endif %}>
   <summary>
-    <span class="hd-label">{% if d.is_today %}{{ t.tk_today }} · {% endif %}{{ d.label }}</span>
+    <span class="hd-label">{% if d.is_today %}{{ t.tk_today }} · {% endif %}{{ d.label }}{% if d.old_engine %} <small class="hd-old">{{ t.hist_old_engine }}</small>{% endif %}</span>
     <span class="hd-count">
       {% if d.won %}<span class="pk-res won">{{ icon('check', 12, 3) }}{{ d.won }}</span>{% endif %}
       {% if d.lost %}<span class="pk-res lost">{{ icon('x', 12, 3) }}{{ d.lost }}</span>{% endif %}
@@ -59,7 +63,7 @@
 {% if sim %}
 <section class="rel sim" aria-labelledby="sim-title">
   <div class="rel-head"><span class="badge">{{ icon('chart', 18, 2.2) }}</span><h2 id="sim-title">{{ t.sim_title }}</h2></div>
-  <p>{{ t.sim_lead.format(n=sim.matches_txt[lang]) }}</p>
+  <p>{{ t.sim_lead.format(n=sim.matches_txt[lang], leagues=(sim.leagues or [])|length) }}</p>
   <div class="stats sim-stats">
   {% for k in tiers %}{% set r = sim.tiers[k] %}
     <div><span class="hs-name"><i class="tdot {{ k }}" aria-hidden="true"></i>{{ t['tier_' ~ k] }}</span><b>{{ r.rate_txt[lang] }}</b><small>{{ t.sim_rate.format(r=r.rate_txt[lang], a=r.announced_txt[lang], n=r.n_txt[lang]) }}</small><small>{{ t.sim_roi.format(r=r.roi_txt[lang]) }}</small></div>

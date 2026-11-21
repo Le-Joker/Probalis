@@ -1371,7 +1371,8 @@
   var MAX_LEGS = 10;
   var FREE_LEGS = 3;
   var TIER_RANGE = { safe: [0.68, 0.80], balanced: [0.55, 0.68], bold: [0.36, 0.50] };
-  var FAM = { '1x2': 'result', dc: 'dc', dnb: 'result', ou: 'goals', btts: 'btts', tt1: 'team', tt2: 'team' };
+  var FAM = { '1x2': 'result', dc: 'dc', dnb: 'result', ou: 'goals', btts: 'btts', tt1: 'team', tt2: 'team', co: 'corners', ca: 'cards' };
+  var bySafe = function (a, b) { return b.p - a.p; };  // du plus sûr au moins sûr
   var nf2 = new Intl.NumberFormat(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   var oddsTxt = function (x) { return nf2.format(x); };
   var pctTxt = function (p) {
@@ -1524,7 +1525,7 @@
       fam[f] = (fam[f] || 0) + 1;
       out.push(c);
     }
-    return out.sort(function (a, b) { return a.ko < b.ko ? -1 : 1; });
+    return out.sort(bySafe);
   };
   // Coupon de k matchs dont la cote bookmaker estimée tombe près de la cible, avec des sélections équilibrées
   var buildCoupon = function (pool, target, k, conf) {
@@ -1575,7 +1576,7 @@
     var out = legs.map(function (i) { return pool[i]; });
     var st = Coupon.stats(out);
     if (st.book < 0.9 * target || st.book > 1.35 * target) return null;
-    return out.sort(function (x, y) { return x.ko < y.ko ? -1 : 1; });
+    return out.sort(bySafe);
   };
   // Le moins de matchs possible, avec chaque sélection à 50 % ou plus
   var autoCoupon = function (ms, target) {
@@ -1825,7 +1826,7 @@
       var legs = Coupon.get();
       var st = Coupon.stats(legs);
       var weak = legs.length >= 2 ? legs.reduce(function (a, b) { return b.p < a.p ? b : a; }).id : null;
-      legsEl.innerHTML = legs.map(function (l) { return legHtml(l, l.id === weak); }).join('');
+      legsEl.innerHTML = legs.slice().sort(bySafe).map(function (l) { return legHtml(l, l.id === weak); }).join('');
       emptyEl.hidden = !!legs.length;
       $('#tk-clear').hidden = !legs.length;
       $('#tk-share').hidden = !legs.length;
@@ -2275,7 +2276,26 @@
     });
   };
 
+  // --- Historique des analyses : onglets Aujourd'hui / Hier / Avant-hier / 7 jours ---
+  var initHistAn = function (scope) {
+    var seg = (scope || doc).querySelector('#ha-seg');
+    if (!seg) return;
+    var box = seg.parentNode;
+    var panels = $$('.ha-panel', box);
+    var show = function (key) {
+      $$('button', seg).forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.ha === key); });
+      panels.forEach(function (p) { p.hidden = p.dataset.ha !== key; });
+    };
+    var first = seg.querySelector('button');
+    show(first ? first.dataset.ha : 'w');
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-ha]');
+      if (b) show(b.dataset.ha);
+    });
+  };
+
   var init = function (scope) {
+    initHistAn(scope);
     initDates(scope);
     initImages(scope);
     initPrices(scope);

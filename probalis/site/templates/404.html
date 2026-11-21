@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Probalis · Page introuvable</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/icons/probalis-icone.svg" type="image/svg+xml">
+<meta name="theme-color" content="#F3F5F8">
+{# Adresse inconnue. Un vieux lien de match (match terminé depuis longtemps) mène à l'historique des analyses. #}
+<script>
+(function () {
+  var m = location.pathname.match(/^\/(fr|en)\/match\//);
+  if (m) location.replace('/' + m[1] + '/historique.html#analyses');
+})();
+</script>
+<style>
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif; background: #F3F5F8; color: #0B1F3A; text-align: center; }
+  main { max-width: 420px; }
+  h1 { margin: 16px 0 8px; font-size: 22px; }
+  p { margin: 0 0 18px; color: #5B6B82; line-height: 1.5; font-size: 14.5px; }
+  a.b { display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 20px; margin: 4px;
+    border-radius: 14px; background: #22C55E; color: #052E16; font-weight: 800; text-decoration: none; }
+  a.b.g { background: #FFFFFF; color: #0B1F3A; border: 1px solid #E3E7EE; }
+  @media (prefers-color-scheme: dark) { body { background: #071426; color: #F1F5F9; } p { color: #94A3B8; }
+    a.b.g { background: #0F2442; color: #F1F5F9; border-color: #1F3A63; } }
+</style>
+</head>
+<body>
+<main>
+  <img src="/icons/probalis-icone.svg" width="56" height="56" alt="Probalis">
+  <h1>{{ t.nf_title }}</h1>
+  <p>{{ t.nf_text }}</p>
+  <a class="b" href="/fr/">{{ t.nf_back }}</a>
+  <a class="b g" href="/fr/historique.html#analyses">{{ t.ha_title }}</a>
+  <p lang="en" style="margin-top: 22px; font-size: 13px;">{{ t_en.nf_title }} · <a href="/en/">{{ t_en.nf_back }}</a></p>
+</main>
+</body>
+</html>

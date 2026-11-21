@@ -1,18 +1,18 @@
 """Chaîne complète : données -> modèles -> prédictions des prochains matchs (avec cotes si disponibles)."""
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from datetime import date, datetime, timedelta, timezone
 
-from ..core.implied import implied_rates
-from ..core.value import Outcome, devig
+from ..core.value import Outcome
+from .engine import LeagueModels, add_counts, analyse, factors as engine_factors, fit_league, load_params
 from .data import load_history, load_upcoming_odds, MatchRow
 from .fixtures import Fixture, finished, league_badge, league_rounds, match_names, upcoming_fixtures
 from .leagues import LEAGUES, League, current_season_start, season_codes
-from .linked import FINAL_ROUND, Linked, men_cups, women
-from .model import fit
-from .predict import Prediction, confidence, predict, predict_from_rates
+from .linked import DOMESTIC_SOURCES, FINAL_ROUND, Linked, men_cups, women, world
+from .predict import Prediction, confidence, predict
 
 # Fenêtre glissante : chaque lancement analyse les matchs d'aujourd'hui jusqu'à J+8
 # (le 19, du 19 au 27 ; le 20, du 20 au 28, etc.).
@@ -96,7 +96,8 @@ def _badge(lg: League, fixtures: list[Fixture]) -> dict:
 
 
 def _match_dict(lg: League, f: Fixture, h: str, a: str, pred: Prediction, model_pred: Prediction, source: str,
-                stature: float, conf: str, priced: dict) -> dict:
+                stature: float, conf: str, priced: dict, factors: list | None = None, counts: dict | None = None,
+                engine: str = "v1") -> dict:
     return {
         "id": f.event_id,
         "slug": f"{f.kickoff_utc.date().isoformat()}-{slugify(f.home_tsdb)}-{slugify(f.away_tsdb)}",
@@ -111,10 +112,44 @@ def _match_dict(lg: League, f: Fixture, h: str, a: str, pred: Prediction, model_
         "top_score": _top_scores(pred, 3),
         "markets": [m.to_dict() for m in pred.markets],
         "priced": priced,
+        "factors": factors or [],
+        "counts": counts or {},
+        "engine": engine,
     }
 
 
-def _linked_matches(lg: League, linked: Linked, today: date, report: dict) -> tuple[list[dict], dict]:
+def _cup_count_rates(h: str, a: str, league_models: dict, kind: str, neutral: bool) -> tuple | None:
+    """Corners (ou cartons) attendus d'un match de coupe d'Europe, à partir du championnat de chaque club.
+
+    Chaque club garde son écart à la moyenne de son championnat (obtenir des corners, en concéder) ;
+    la base est la moyenne des deux championnats. Un club dont le championnat n'a pas ces chiffres compte
+    comme un club moyen (« estimation moins sûre »)."""
+    def side(node: str):
+        if "|" not in node:
+            return None
+        country, team = node.split("|", 1)
+        src = DOMESTIC_SOURCES.get(country)
+        lm = league_models.get(src[1]) if src and src[0] == "main" else None
+        m = getattr(lm, kind) if lm else None
+        if m is None or not m.knows(team):
+            return None
+        i = m._idx[team]  # noqa: SLF001
+        return m, float(m.attack[i]), float(m.defence[i])
+
+    sh, sa = side(h), side(a)
+    if not (sh or sa):
+        return None
+    ms = [x[0] for x in (sh, sa) if x]
+    c = sum(m.intercept for m in ms) / len(ms)
+    g = 0.0 if neutral else sum(m.home_adv for m in ms) / len(ms)
+    ah, dh = (sh[1], sh[2]) if sh else (0.0, 0.0)
+    aa, da = (sa[1], sa[2]) if sa else (0.0, 0.0)
+    rates = (math.exp(c + g + ah + da), math.exp(c + aa + dh)), (math.exp(c + g), math.exp(c))
+    return rates, bool(sh and sa)
+
+
+def _linked_matches(lg: League, linked: Linked, today: date, report: dict,
+                    league_models: dict | None = None) -> tuple[list[dict], dict]:
     """Matchs d'une coupe d'Europe ou d'un championnat féminin, analysés par le modèle relié.
 
     Pas de cotes gratuites pour ces compétitions : l'analyse vient du modèle seul, la confiance est donc
@@ -125,6 +160,9 @@ def _linked_matches(lg: League, linked: Linked, today: date, report: dict) -> tu
     m = linked.model
     quality = {t: float(m.attack[i] - m.defence[i]) for i, t in enumerate(m.teams)}
     out = []
+    p = load_params()
+    nodes = [n for f in fixtures for n in (linked.node(f.home_id), linked.node(f.away_id)) if n]
+    pool = sorted(set(nodes)) if lg.cup else [t for t in m.teams if m.group_of.get(t) == lg.code]
     for f in fixtures:
         h, a = linked.node(f.home_id), linked.node(f.away_id)
         if not (h and a):
@@ -133,8 +171,20 @@ def _linked_matches(lg: League, linked: Linked, today: date, report: dict) -> tu
         view = m.view(kind, neutral=str(f.round) == FINAL_ROUND)
         pred = predict(view, h, a)
         conf = confidence(view, h, a)
-        out.append(_match_dict(lg, f, h, a, pred, pred, "model", quality[h] + quality[a],
-                               "medium" if conf == "high" else conf, {}))
+        conf = "medium" if conf == "high" else conf
+        rates, partial = {}, False
+        if lg.category == "europe" and league_models:
+            for k in ("corners", "cards"):
+                r = _cup_count_rates(h, a, league_models, k, str(f.round) == FINAL_ROUND)
+                if r:
+                    rates[k] = r[0]
+                    partial = partial or not r[1]
+        counts = add_counts(pred, None, None, h, a, p, rates=rates)
+        if counts and partial:
+            counts["partial"] = True
+        facts = engine_factors(LeagueModels(view, season_teams=pool), h, a, pred.lam, pred.mu, {}, None, conf)
+        out.append(_match_dict(lg, f, h, a, pred, pred, "model", quality[h] + quality[a], conf, {}, facts, counts,
+                               p.version))
     report["leagues"][lg.code] = {"fixtures": len(fixtures), "predicted": len(out), "train_matches": m.n_matches,
                                   "rho": round(m.rho, 3),
                                   "home_adv": round(m.home_cup if lg.cup else m.home_dom, 3)}
@@ -142,7 +192,7 @@ def _linked_matches(lg: League, linked: Linked, today: date, report: dict) -> tu
 
 
 def _run_linked(name: str, builder, lgs: list[League], today: date, matches: list, report: dict,
-                league_info: dict, verbose: bool) -> None:
+                league_info: dict, verbose: bool, league_models: dict | None = None) -> None:
     if not lgs:
         return
     try:
@@ -155,7 +205,7 @@ def _run_linked(name: str, builder, lgs: list[League], today: date, matches: lis
         return
     report[name] = linked.report
     for lg in lgs:
-        ms, league_info[lg.code] = _linked_matches(lg, linked, today, report)
+        ms, league_info[lg.code] = _linked_matches(lg, linked, today, report, league_models)
         matches += ms
         if verbose:
             print(f"  {lg.code:>5} {lg.name_fr:<28} {len(ms)}/{report['leagues'][lg.code]['fixtures']} matchs analysés")
@@ -168,6 +218,7 @@ def run(today: date | None = None, leagues: tuple[League, ...] = LEAGUES, verbos
     odds_rows = load_upcoming_odds()
     matches, report = [], {"unmatched": [], "leagues": {}}
     league_info: dict[str, dict] = {}
+    league_models: dict[str, LeagueModels] = {}
     for lg in (lg for lg in leagues if lg.category == "domestic"):
         hist = load_history(lg.code, seasons)
         if len(hist) < 100:
@@ -182,7 +233,10 @@ def run(today: date | None = None, leagues: tuple[League, ...] = LEAGUES, verbos
         fresh = _fresh_results(lg, events, hist, names)
         if fresh:
             hist = sorted(hist + fresh, key=lambda m: m.date)
-        model = fit(hist, today, include_ref_day=True)
+        params = load_params()
+        lm = fit_league(hist, today, params, include_ref_day=True, season_teams=_season_teams(hist, start))
+        league_models[lg.code] = lm
+        model = lm.goals
         quality = {t: a - d for t, a, d in model.ratings()}  # attaque moins défense : sert à choisir le match à la une
         n_ok = 0
         for f in fixtures:
@@ -193,25 +247,20 @@ def run(today: date | None = None, leagues: tuple[League, ...] = LEAGUES, verbos
             row = next((r for r in odds_rows if r.league == lg.code and r.home == h and r.away == a
                         and abs((r.date - f.kickoff_utc.date()).days) <= 1), None)
             odds = _odds_markets(row) if row else {}
-            model_pred = predict(model, h, a)
-            source = "model"
-            pred = model_pred
-            if ("1x2", None) in odds:
-                # Les cotes du marché sont plus précises que notre modèle seul (voir docs/05-fiabilite.md) :
-                # on cale les buts attendus sur elles, puis on en déduit tous les autres marchés.
-                sel = odds[("1x2", None)]
-                p1x2 = devig([sel[k]["avg"] for k in ("1", "X", "2")])
-                ou = odds.get(("ou", 2.5))
-                p_over = devig([ou["over"]["avg"], ou["under"]["avg"]])[0] if ou else None
-                lam, mu = implied_rates(p1x2, model.rho, p_over, start=(model_pred.lam, model_pred.mu))
-                pred = predict_from_rates(model, h, a, lam, mu)
-                source = "market"
-            matches.append(_match_dict(lg, f, h, a, pred, model_pred, source, quality[h] + quality[a],
-                                       "high" if source == "market" else confidence(model, h, a),
-                                       _priced(pred, odds)))
+            # Avec les cotes, le moteur mélange son analyse et celle du marché (poids appris sur le passé,
+            # voir football/engine.py et docs/05-fiabilite.md), puis en déduit tous les autres marchés.
+            o12 = [odds[("1x2", None)][k]["avg"] for k in ("1", "X", "2")] if ("1x2", None) in odds else None
+            ou = odds.get(("ou", 2.5))
+            oou = [ou["over"]["avg"], ou["under"]["avg"]] if ou else None
+            an = analyse(lm, h, a, o12, oou, params)
+            matches.append(_match_dict(lg, f, h, a, an.pred, an.model_pred, an.source, quality[h] + quality[a],
+                                       an.confidence, _priced(an.pred, odds), an.factors, an.counts,
+                                       params.version))
             n_ok += 1
         report["leagues"][lg.code] = {"fixtures": len(fixtures), "predicted": n_ok, "train_matches": model.n_matches,
-                                      "fresh_results": len(fresh),
+                                      "fresh_results": len(fresh), "engine": params.version,
+                                      "shots": lm.xg is not None, "corners": lm.corners is not None,
+                                      "cards": lm.cards is not None,
                                       "rho": round(model.rho, 3), "home_adv": round(model.home_adv, 3),
                                       "first_half_share": round(model.first_half_share, 3)}
         if verbose:
@@ -219,6 +268,8 @@ def run(today: date | None = None, leagues: tuple[League, ...] = LEAGUES, verbos
             print(f"  {lg.code:>3} {lg.name_fr:<15} {n_ok}/{len(fixtures)} matchs analysés "
                   f"({model.n_matches} matchs d'entraînement{extra})")
     _run_linked("europe", men_cups, [lg for lg in leagues if lg.category == "europe"], today, matches, report,
+                league_info, verbose, league_models)
+    _run_linked("world", world, [lg for lg in leagues if lg.category == "world"], today, matches, report,
                 league_info, verbose)
     _run_linked("women", women, [lg for lg in leagues if lg.category == "women"], today, matches, report,
                 league_info, verbose)

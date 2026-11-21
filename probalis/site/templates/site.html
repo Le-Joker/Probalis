@@ -86,7 +86,7 @@
   <div class="wrap proof-in">
     <div class="proof-copy">
       <h2 id="proof-h">{{ s.proof_h2 }}</h2>
-      <p>{{ s.proof_lead.format(season=sim.season, n=sim.n_txt) }}</p>
+      <p>{{ s.proof_lead.format(season=sim.season, n=sim.n_txt, leagues=sim.n_leagues) }}</p>
       <p class="proof-note">{{ icon('info', 18, 2.2) }}<span>{{ s.proof_note.format(lo=sim.lo, hi=sim.hi) }} <a href="#cote">{{ s.proof_note_link }}</a></span></p>
     </div>
     <figure class="cal" id="cal">

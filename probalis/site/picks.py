@@ -23,7 +23,11 @@ STANDARD = (("1x2", None, ("1", "2")), ("dc", None, ("1X", "X2", "12")),
             ("ou", 1.5, ("over", "under")), ("ou", 2.5, ("over", "under")), ("ou", 3.5, ("over", "under")),
             ("btts", None, ("yes", "no")), ("tt1", 0.5, ("over",)), ("tt2", 0.5, ("over",)),
             ("tt1", 1.5, ("over",)), ("tt2", 1.5, ("over",)))
-FAMILY = {"1x2": "result", "dc": "dc", "ou": "goals", "btts": "btts", "tt1": "team", "tt2": "team"}
+# Corners et cartons : seulement au Ticket (pas dans les paris du jour, tant que l'historique n'a pas montré leur fiabilité)
+COUNTS = (("co", 8.5, ("over", "under")), ("co", 9.5, ("over", "under")), ("co", 10.5, ("over", "under")),
+          ("ca", 3.5, ("over", "under")), ("ca", 4.5, ("over", "under")))
+FAMILY = {"1x2": "result", "dc": "dc", "ou": "goals", "btts": "btts", "tt1": "team", "tt2": "team",
+          "co": "corners", "ca": "cards"}
 
 # Niveaux : fourchette de probabilité (cote juste ≈ 1,25–1,47 / 1,47–1,82 / 2–2,8)
 TIERS = {"safe": (0.68, 0.80), "balanced": (0.55, 0.68), "bold": (0.36, 0.50)}
@@ -53,10 +57,10 @@ def pick_id(mid: str, key: str, line, sel: str) -> str:
     return f"{mid}|{key}|{'' if line is None else line}|{sel}"
 
 
-def candidates(m: dict) -> list[dict]:
-    """Paris classiques d'un match, avec leur probabilité et leur cote juste."""
+def candidates(m: dict, counts: bool = False) -> list[dict]:
+    """Paris classiques d'un match, avec leur probabilité et leur cote juste (counts : corners et cartons en plus)."""
     out = []
-    for key, line, sels in STANDARD:
+    for key, line, sels in STANDARD + (COUNTS if counts else ()):
         mk = _find(m, key, line)
         if not mk:
             continue

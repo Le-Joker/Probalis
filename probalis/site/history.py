@@ -8,6 +8,12 @@ figurent pas (le jour est alors marqué « sealed »). La version complète est 
 Règle d'honnêteté : la liste d'un jour est figée dès le premier calcul fait ce jour-là (ou plus tard) ;
 ensuite elle ne change plus, même si le modèle change d'avis. Les listes des jours suivants restent
 provisoires jusque-là. Tout pari enregistré a donc été publié avant le coup d'envoi de son match.
+
+Analyses des matchs (« an ») : chaque jour garde aussi les verdicts OUI / NON de chaque match analysé, enregistrés
+avant le coup d'envoi (un jour figé reçoit encore les matchs qui n'ont pas commencé, jamais de changement sur
+ceux déjà enregistrés). Ils sont réglés avec le score final ; les corners et cartons avec les chiffres publiés par
+football-data (championnats seulement : les coupes et les compétitions sans chiffres sont « non vérifiables »).
+Les analyses sont publiques une fois le match terminé. Détail gardé AN_DAYS jours, ensuite seulement le bilan.
 """
 from __future__ import annotations
 
@@ -17,8 +23,10 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ..football import fixtures
-from ..football.data import CACHE, USER_AGENT
+from ..core import verdicts as vd
+from ..football import fixtures, signals
+from ..football.data import CACHE, USER_AGENT, parse_csv
+from ..football.leagues import BY_CODE, current_season_start, season_codes
 from . import picks
 
 LOCAL = CACHE / "history.json"
@@ -26,6 +34,8 @@ VERSION = 1
 SETTLE_AFTER = timedelta(hours=2, minutes=30)   # un match est fini environ 2 h après le coup d'envoi
 GIVE_UP_AFTER = timedelta(days=6)                # sans score au bout de 6 jours (reporté, annulé) : remboursé
 MAX_LOOKUPS = 40                                 # appels TheSportsDB par construction pour les scores manquants
+AN_DAYS = 30                                     # analyses des matchs gardées en détail (ensuite : le bilan du jour)
+NV = "nv"                                        # verdict non vérifiable (pas de chiffres gratuits)
 
 
 def _empty() -> dict:
@@ -69,19 +79,31 @@ def merge(a: dict | None, b: dict | None) -> dict:
     return out
 
 
-def public_copy(hist: dict) -> dict:
-    """Ce qui est publié : seulement les paris et coupons déjà réglés (les autres sont réservés au Premium)."""
+def match_over(mt: dict, now: datetime | None) -> bool:
+    """Match terminé (score connu, reporté) ou commencé depuis plus de SETTLE_AFTER."""
+    if mt.get("score") or mt.get("void"):
+        return True
+    return now is not None and now >= datetime.fromisoformat(mt["kickoff"]) + SETTLE_AFTER
+
+
+def public_copy(hist: dict, now: datetime | None = None) -> dict:
+    """Ce qui est publié : seulement les paris et coupons déjà réglés (les autres sont réservés au Premium),
+    et les analyses des matchs terminés."""
     out = {k: v for k, v in hist.items() if k != "days"}
     out["days"] = {}
     for day, e in (hist.get("days") or {}).items():
         tiers = {t: [c for c in lst if c.get("res")] for t, lst in (e.get("tiers") or {}).items()}
         coupons = [cp for cp in e.get("coupons") or [] if cp.get("res")]
+        ms = e.get("matches") or {}
+        an = {mid: rec for mid, rec in (e.get("an") or {}).items() if match_over(ms.get(mid) or {}, now)}
         hidden = sum(len(lst) for lst in (e.get("tiers") or {}).values()) + len(e.get("coupons") or []) \
-            - sum(len(lst) for lst in tiers.values()) - len(coupons)
-        used = {c["mid"] for lst in tiers.values() for c in lst} | {c["mid"] for cp in coupons for c in cp["legs"]}
-        d = {k: v for k, v in e.items() if k not in ("tiers", "coupons", "matches")}
-        d.update(tiers=tiers, coupons=coupons,
-                 matches={mid: mt for mid, mt in (e.get("matches") or {}).items() if mid in used})
+            - sum(len(lst) for lst in tiers.values()) - len(coupons) + len(e.get("an") or {}) - len(an)
+        used = {c["mid"] for lst in tiers.values() for c in lst} | {c["mid"] for cp in coupons for c in cp["legs"]} \
+            | set(an)
+        d = {k: v for k, v in e.items() if k not in ("tiers", "coupons", "matches", "an")}
+        d.update(tiers=tiers, coupons=coupons, matches={mid: mt for mid, mt in ms.items() if mid in used})
+        if an:
+            d["an"] = an
         if hidden:
             d["sealed"] = hidden
         out["days"][day] = d
@@ -109,9 +131,56 @@ def load(site_url: str) -> dict:
 
 
 def _match_info(m: dict) -> dict:
-    return {"slug": m["slug"], "league": m["league"], "kickoff": m["kickoff"], "conf": m.get("confidence"),
+    info = {"slug": m["slug"], "league": m["league"], "kickoff": m["kickoff"], "conf": m.get("confidence"),
             "home": {"name": m["home"]["name"], "badge": m["home"].get("badge")},
             "away": {"name": m["away"]["name"], "badge": m["away"].get("badge")}}
+    if m["home"].get("fd") and m["away"].get("fd"):
+        info["fd"] = [m["home"]["fd"], m["away"]["fd"]]
+    return info
+
+
+def _vslim(v: dict) -> dict:
+    d = {"f": v["fam"], "k": v["key"], "l": v["line"], "s": v["sel"], "y": int(bool(v["yes"])), "p": round(v["p"], 3)}
+    if v["open"]:
+        d["o"] = 1
+    return d
+
+
+def verdict_of(d: dict) -> dict:
+    """Verdict enregistré -> même forme que core.verdicts (pour les textes et le règlement)."""
+    return {"fam": d["f"], "key": d["k"], "line": d["l"], "sel": d["s"], "yes": bool(d["y"]), "p": d["p"],
+            "open": bool(d.get("o"))}
+
+
+def analysis_record(m: dict, rel: dict) -> dict:
+    """Ce qu'on garde de l'analyse d'un match : ses verdicts, le plus sûr, le 1X2, le score le plus probable."""
+    vs = vd.verdicts(m["markets"])
+    b = vd.best(vs, rel)
+    rec = {"v": [_vslim(v) for v in vs], "b": next((i for i, v in enumerate(vs) if v is b), None),
+           "eng": m.get("engine", "v1")}
+    x = next((mk for mk in m["markets"] if mk["key"] == "1x2" and mk.get("line") is None), None)
+    if x:
+        rec["x"] = [round(x["sel"][s]["p"], 3) for s in ("1", "X", "2")]
+    if m.get("top_score"):
+        rec["ts"] = m["top_score"][0][0]
+    c = m.get("counts") or {}
+    if c.get("corners") or c.get("cards"):
+        rec["c"] = {k: c[k] for k in ("corners", "cards", "partial") if c.get(k)}
+    return rec
+
+
+def _analyses(day: dict, ms: list[dict], now: datetime, rel: dict, keep: bool) -> None:
+    """Ajoute l'analyse des matchs pas encore commencés. keep : un jour figé ne change jamais ce qui est déjà là."""
+    an = day.setdefault("an", {}) if keep else {}
+    for m in ms:
+        if m["league"] not in BY_CODE or datetime.fromisoformat(m["kickoff"]) <= now:
+            continue
+        if keep and m["id"] in an:
+            continue
+        an[m["id"]] = analysis_record(m, rel)
+        day.setdefault("matches", {}).setdefault(m["id"], _match_info(m))
+    if not keep:
+        day["an"] = an
 
 
 def _slim(c: dict) -> dict:
@@ -128,8 +197,12 @@ def day_lists(matches: list[dict], after: datetime | None) -> dict:
     return {"tiers": tiers, "coupons": coupons, "matches": {mid: _match_info(by_id[mid]) for mid in sorted(used)}}
 
 
-def update(hist: dict, matches: list[dict], now: datetime) -> dict:
-    """Ajoute ou recalcule les listes des jours à venir ; fige celles d'aujourd'hui et des jours passés."""
+def update(hist: dict, matches: list[dict], now: datetime, rel: dict | None = None) -> dict:
+    """Ajoute ou recalcule les listes des jours à venir ; fige celles d'aujourd'hui et des jours passés.
+    Enregistre aussi l'analyse de chaque match à venir (rel : tableau de fiabilité du moteur)."""
+    if rel is None:
+        from ..football.engine import load_params
+        rel = load_params().reliability
     today = picks.day_key(now)
     days = hist.setdefault("days", {})
     for day, e in days.items():
@@ -139,13 +212,37 @@ def update(hist: dict, matches: list[dict], now: datetime) -> dict:
     for m in matches:
         by_day.setdefault(picks.day_key(m["kickoff"]), []).append(m)
     for day, ms in sorted(by_day.items()):
-        if day < today or (days.get(day) or {}).get("frozen"):
+        if day < today:
+            continue
+        cur = days.get(day)
+        if cur and cur.get("frozen"):
+            _analyses(cur, ms, now, rel, keep=True)
             continue
         lists = day_lists(ms, after=now)
-        if not lists["matches"]:
+        entry = {"built": now.isoformat(timespec="seconds"), "frozen": day == today, "eng": _engine(ms), **lists}
+        _analyses(entry, ms, now, rel, keep=False)
+        if not entry["matches"]:
             continue
-        days[day] = {"built": now.isoformat(timespec="seconds"), "frozen": day == today, **lists}
+        days[day] = entry
+    compact(hist, today)
     return hist
+
+
+def _engine(ms: list[dict]) -> str:
+    return next((m.get("engine") for m in ms if m.get("engine")), "v1")
+
+
+def compact(hist: dict, today: str) -> None:
+    """Au-delà de AN_DAYS jours : on ne garde que le bilan des analyses du jour (et les matchs des paris)."""
+    limit = (datetime.fromisoformat(today) - timedelta(days=AN_DAYS)).date().isoformat()
+    for day, e in (hist.get("days") or {}).items():
+        if day >= limit or "an" not in e:
+            continue
+        e["an_sum"] = an_stats(e)
+        used = {c["mid"] for lst in (e.get("tiers") or {}).values() for c in lst} \
+            | {c["mid"] for cp in e.get("coupons") or [] for c in cp["legs"]}
+        e["matches"] = {mid: mt for mid, mt in (e.get("matches") or {}).items() if mid in used}
+        del e["an"]
 
 
 def _scores_from_cache() -> dict[str, dict]:
@@ -165,24 +262,73 @@ def _scores_from_cache() -> dict[str, dict]:
 _VOID_STATUS = {"postponed", "pst", "cancelled", "canc", "abandoned", "abd"}
 
 
+class _FdRows:
+    """Matchs joués des fichiers football-data déjà téléchargés : (championnat, date, domicile, extérieur) -> ligne."""
+
+    def __init__(self):
+        self.files: dict[tuple[str, str], dict] = {}
+
+    def find(self, code: str, kickoff: str, home: str, away: str):
+        ko = datetime.fromisoformat(kickoff)
+        season = season_codes(current_season_start(ko.date()), 1)[0]
+        rows = self.files.get((code, season))
+        if rows is None:
+            path = CACHE / f"{code}_{season}.csv"
+            rows = {}
+            if path.exists():
+                for r in parse_csv(path.read_bytes(), code):
+                    if r.played:
+                        rows[(r.date.isoformat(), r.home, r.away)] = r
+            self.files[(code, season)] = rows
+        for d in (ko.date(), (ko - timedelta(hours=12)).date(), (ko + timedelta(hours=12)).date()):
+            r = rows.get((d.isoformat(), home, away))
+            if r:
+                return r
+        return None
+
+
+def _has_counts(e: dict, mid: str) -> bool:
+    return any(d["k"] in ("co", "ca") for d in ((e.get("an") or {}).get(mid) or {}).get("v", []))
+
+
 def settle(hist: dict, now: datetime, lookups: int = MAX_LOOKUPS) -> int:
     """Remplit les scores des matchs terminés, puis le résultat de chaque pari et de chaque coupon."""
     known = None
+    fd = _FdRows()
     filled = 0
     for day in sorted(hist.get("days", {})):
         e = hist["days"][day]
         if not e.get("frozen"):
             continue
         for mid, mt in e.get("matches", {}).items():
+            ko = datetime.fromisoformat(mt["kickoff"])
+            lg = BY_CODE.get(mt["league"])
+            domestic = bool(lg and lg.category == "domestic" and mt.get("fd"))
+            # Corners et cartons : chiffres de football-data (championnats), sinon « non vérifiable »
+            if mt.get("score") and not mt.get("st") and not mt.get("nost") and _has_counts(e, mid):
+                row = fd.find(mt["league"], mt["kickoff"], *mt["fd"]) if domestic else None
+                st = {}
+                if row:
+                    if (c := signals.corners(row)):
+                        st["corners"] = [int(c[0]), int(c[1])]
+                    if (c := signals.cards(row)):
+                        st["cards"] = [int(c[0]), int(c[1])]
+                if st:
+                    mt["st"] = st
+                elif not domestic or now > ko + GIVE_UP_AFTER:
+                    mt["nost"] = True
             if mt.get("score") or mt.get("void"):
                 continue
-            ko = datetime.fromisoformat(mt["kickoff"])
             if now < ko + SETTLE_AFTER:
                 continue
             if known is None:
                 known = _scores_from_cache()
             ev = known.get(mid)
             sc = fixtures.score(ev) if ev else None
+            if sc is None and domestic:
+                row = fd.find(mt["league"], mt["kickoff"], *mt["fd"])
+                if row:
+                    sc = (row.fthg, row.ftag)
             if sc is None and lookups > 0:
                 lookups -= 1
                 res = fixtures._get("lookupevent", {"id": mid}, 2)
@@ -211,7 +357,46 @@ def _leg_result(e: dict, c: dict) -> str | None:
     return picks.settle(c["key"], c["line"], c["sel"], hg, ag)
 
 
+def verdict_results(e: dict, mid: str, rec: dict) -> list:
+    """Résultat de chaque verdict d'un match : won, lost, void, nv (non vérifiable) ou None (en attente)."""
+    mt = (e.get("matches") or {}).get(mid) or {}
+    out = []
+    for d in rec.get("v", []):
+        if mt.get("void"):
+            out.append("void")
+            continue
+        if not mt.get("score"):
+            out.append(None)
+            continue
+        r = vd.settle(verdict_of(d), *mt["score"], mt.get("st"))
+        if r is None and d["k"] in ("co", "ca") and (mt.get("nost") or mt.get("st")):
+            r = NV
+        out.append(r)
+    return out
+
+
+def an_stats(e: dict) -> dict:
+    """Bilan des analyses d'un jour : verdicts justes (hors « serré » et non vérifiables), et le plus sûr."""
+    if "an" not in e:
+        return e.get("an_sum") or {"n": 0, "won": 0, "ann": None, "bn": 0, "bw": 0, "m": 0}
+    n = won = bn = bw = 0
+    ann = 0.0
+    for rec in e["an"].values():
+        for i, (d, r) in enumerate(zip(rec.get("v", []), rec.get("r") or [])):
+            if d.get("o") or r not in ("won", "lost"):
+                continue
+            n += 1
+            won += r == "won"
+            ann += d["p"]
+            if i == rec.get("b"):
+                bn += 1
+                bw += r == "won"
+    return {"n": n, "won": won, "ann": ann / n if n else None, "bn": bn, "bw": bw, "m": len(e["an"])}
+
+
 def _apply_results(e: dict) -> None:
+    for mid, rec in (e.get("an") or {}).items():
+        rec["r"] = verdict_results(e, mid, rec)
     for lst in e.get("tiers", {}).values():
         for c in lst:
             c["res"] = _leg_result(e, c)
@@ -227,8 +412,8 @@ def save(hist: dict, public_dir: Path, now: datetime) -> None:
     LOCAL.parent.mkdir(parents=True, exist_ok=True)
     LOCAL.write_text(json.dumps(hist, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     public_dir.mkdir(parents=True, exist_ok=True)
-    (public_dir / "history.json").write_text(json.dumps(public_copy(hist), ensure_ascii=False, separators=(",", ":")),
-                                             encoding="utf-8")
+    (public_dir / "history.json").write_text(json.dumps(public_copy(hist, now), ensure_ascii=False,
+                                                        separators=(",", ":")), encoding="utf-8")
 
 
 # --- Bilan ------------------------------------------------------------------------------------------------

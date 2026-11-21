@@ -57,6 +57,12 @@ ALIASES = {
     "corum fk": "Corum",
     "universitatea cluj": "U. Cluj",
     "heart of midlothian": "Hearts",
+    "celta fortuna": "Celta B",
+    "celta vigo b": "Celta B",
+    "real sociedad b": "Sociedad B",
+    "sanse": "Sociedad B",
+    "sporting gijon": "Sp Gijon",
+    "real sporting de gijon": "Sp Gijon",
 }
 _ABBREV = {"man": "manchester", "utd": "united", "nottm": "nottingham", "weds": "wednesday", "sp": "sporting",
            "ath": "athletic", "ein": "eintracht", "st": "saint"}
